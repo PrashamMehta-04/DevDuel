@@ -1,0 +1,25 @@
+{
+  "name": "worker",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "nodemon src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@devduel/shared": "*",
+    "bullmq": "^4.0.0",
+    "dockerode": "^4.0.0",
+    "dotenv": "^16.0.0",
+    "ioredis": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/dockerode": "^3.3.19",
+    "@types/node": "^20.0.0",
+    "nodemon": "^3.0.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.0"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "devduel",
+  "version": "1.0.0",
+  "description": "Real-time 1v1 competitive programming platform",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w apps/backend & npm run dev -w apps/frontend",
+    "build": "npm run build --workspaces",
+    "test": "npm test --workspaces"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "prettier": "^3.0.0"
+  }
+}
