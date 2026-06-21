@@ -1,9 +1,33 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Swords, Code2, Trophy, Flame, Target, Users, Zap, Clock } from 'lucide-react';
+import { Swords, Code2, Trophy, Flame, Target, Users, Zap, Clock, Loader2 } from 'lucide-react';
+import { useArenaStore } from '../store/useArenaStore';
+import { socket } from '../socket';
+import { SOCKET_EVENTS } from '@devduel/shared';
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
+  const { setGameMode, setMatchId, userId } = useArenaStore();
+  const [isSearching, setIsSearching] = useState(false);
+
+  useEffect(() => {
+    const onMatchFound = (payload: { matchId: string, opponentId: string }) => {
+      setIsSearching(false);
+      setMatchId(payload.matchId);
+      setGameMode('battle');
+      navigate('/arena');
+    };
+
+    socket.on(SOCKET_EVENTS.MATCH_FOUND, onMatchFound);
+    return () => {
+      socket.off(SOCKET_EVENTS.MATCH_FOUND, onMatchFound);
+    };
+  }, [navigate, setGameMode, setMatchId]);
+
+  const handleFindMatch = () => {
+    setIsSearching(true);
+    socket.emit(SOCKET_EVENTS.FIND_MATCH, { userId, rating: 1450 }); // MVP rating
+  };
 
   return (
     <div className="min-h-screen w-full relative flex flex-col bg-[#0B0F19] text-white">
@@ -64,7 +88,10 @@ const DashboardPage: React.FC = () => {
               
               <div className="flex items-center gap-4 mt-4">
                 <button 
-                  onClick={() => navigate('/arena')}
+                  onClick={() => {
+                    setGameMode('solo');
+                    navigate('/arena');
+                  }}
                   className="bg-white hover:bg-gray-100 text-black px-6 py-3 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.4)] hover:-translate-y-0.5 flex items-center gap-2"
                 >
                   <Code2 size={18} /> Solve Solo
@@ -92,10 +119,12 @@ const DashboardPage: React.FC = () => {
               </div>
               
               <button 
-                onClick={() => navigate('/arena')}
-                className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white px-4 py-3.5 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:shadow-[0_0_25px_rgba(168,85,247,0.6)] hover:-translate-y-0.5 flex items-center justify-center gap-2 border border-purple-400/30"
+                onClick={handleFindMatch}
+                disabled={isSearching}
+                className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white px-4 py-3.5 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:shadow-[0_0_25px_rgba(168,85,247,0.6)] hover:-translate-y-0.5 flex items-center justify-center gap-2 border border-purple-400/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
               >
-                <Swords size={18} /> Find Match
+                {isSearching ? <Loader2 size={18} className="animate-spin" /> : <Swords size={18} />}
+                {isSearching ? 'Searching...' : 'Find Match'}
               </button>
             </div>
           </div>

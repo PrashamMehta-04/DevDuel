@@ -14,7 +14,8 @@ const MatchPanel: React.FC = () => {
     matchId, 
     userId,
     supportedLanguages,
-    setLanguage
+    setLanguage,
+    gameMode
   } = useArenaStore();
 
   const handleRun = () => {
@@ -71,41 +72,45 @@ const MatchPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* Opponent Tracker */}
-      <div className="glass-panel rounded-2xl p-6 flex flex-col gap-6 relative overflow-hidden flex-1 group">
-        <div className="absolute bottom-0 left-0 w-40 h-40 bg-purple-500/10 rounded-full blur-[60px] -ml-10 -mb-10 transition-all duration-700 group-hover:bg-purple-500/20"></div>
+      {/* Opponent Tracker - Only visible in battle mode */}
+      {gameMode === 'battle' ? (
+        <div className="glass-panel rounded-2xl p-6 flex flex-col gap-6 relative overflow-hidden flex-1 group">
+          <div className="absolute bottom-0 left-0 w-40 h-40 bg-purple-500/10 rounded-full blur-[60px] -ml-10 -mb-10 transition-all duration-700 group-hover:bg-purple-500/20"></div>
 
-        <div className="flex items-center gap-3 z-10">
-          <div className="p-2 bg-white/5 rounded-lg border border-white/10 shadow-inner">
-            <Trophy size={18} className="text-yellow-400" />
-          </div>
-          <h3 className="text-sm font-bold text-gray-200 uppercase tracking-wider">Battle Status</h3>
-        </div>
-        
-        <div className="space-y-6 z-10">
-          <div className="space-y-3">
-            <div className="flex justify-between items-end">
-              <span className="text-sm font-semibold text-gray-300">Opponent <span className="text-gray-500 font-normal">(ProCoder123)</span></span>
-              <span className="text-lg font-black text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]">{opponentProgress}%</span>
+          <div className="flex items-center gap-3 z-10">
+            <div className="p-2 bg-white/5 rounded-lg border border-white/10 shadow-inner">
+              <Trophy size={18} className="text-yellow-400" />
             </div>
-            <div className="w-full bg-black/50 rounded-full h-3 p-0.5 border border-white/5 shadow-inner">
-              <div 
-                className="bg-gradient-to-r from-yellow-600 to-yellow-400 h-full rounded-full transition-all duration-700 ease-out relative overflow-hidden shadow-[0_0_10px_rgba(250,204,21,0.5)]"
-                style={{ width: `${opponentProgress}%` }}
-              >
-                <div className="absolute inset-0 bg-white/20 w-full h-full animate-[shimmer_2s_infinite]" style={{ backgroundImage: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)' }}></div>
+            <h3 className="text-sm font-bold text-gray-200 uppercase tracking-wider">Battle Status</h3>
+          </div>
+          
+          <div className="space-y-6 z-10">
+            <div className="space-y-3">
+              <div className="flex justify-between items-end">
+                <span className="text-sm font-semibold text-gray-300">Opponent <span className="text-gray-500 font-normal">(ProCoder123)</span></span>
+                <span className="text-lg font-black text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]">{opponentProgress}%</span>
+              </div>
+              <div className="w-full bg-black/50 rounded-full h-3 p-0.5 border border-white/5 shadow-inner">
+                <div 
+                  className="bg-gradient-to-r from-yellow-600 to-yellow-400 h-full rounded-full transition-all duration-700 ease-out relative overflow-hidden shadow-[0_0_10px_rgba(250,204,21,0.5)]"
+                  style={{ width: `${opponentProgress}%` }}
+                >
+                  <div className="absolute inset-0 bg-white/20 w-full h-full animate-[shimmer_2s_infinite]" style={{ backgroundImage: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)' }}></div>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className={`p-4 glass-panel rounded-xl flex items-center gap-3 transition-all duration-500 ${isOpponentTyping ? 'border-yellow-500/30 shadow-[0_0_15px_rgba(234,179,8,0.15)]' : 'border-white/5'}`}>
-            <Activity size={16} className={isOpponentTyping ? 'text-yellow-400 animate-pulse' : 'text-gray-600'} />
-            <span className={`text-sm font-medium ${isOpponentTyping ? 'text-yellow-400' : 'text-gray-500'}`}>
-              {isOpponentTyping ? 'Typing code...' : 'Idle'}
-            </span>
+            <div className={`p-4 glass-panel rounded-xl flex items-center gap-3 transition-all duration-500 ${isOpponentTyping ? 'border-yellow-500/30 shadow-[0_0_15px_rgba(234,179,8,0.15)]' : 'border-white/5'}`}>
+              <Activity size={16} className={isOpponentTyping ? 'text-yellow-400 animate-pulse' : 'text-gray-600'} />
+              <span className={`text-sm font-medium ${isOpponentTyping ? 'text-yellow-400' : 'text-gray-500'}`}>
+                {isOpponentTyping ? 'Typing code...' : 'Idle'}
+              </span>
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex-1"></div>
+      )}
 
       {/* Controls */}
       <div className="glass-panel rounded-2xl p-5 flex flex-col gap-4">

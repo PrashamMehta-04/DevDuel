@@ -22,6 +22,10 @@ interface ArenaState {
   setIsConnected: (connected: boolean) => void;
   testResult: any | null;
   setTestResult: (result: any | null) => void;
+  gameMode: 'solo' | 'battle';
+  setGameMode: (mode: 'solo' | 'battle') => void;
+  matchOverResult: any | null;
+  setMatchOverResult: (result: any | null) => void;
 }
 
 const LANGUAGES = [
@@ -45,6 +49,8 @@ export const useArenaStore = create<ArenaState>((set) => ({
   isOpponentTyping: false,
   isConnected: false,
   testResult: null,
+  gameMode: 'solo',
+  matchOverResult: null,
   setMatchId: (matchId) => set({ matchId }),
   setUserId: (userId) => set({ userId }),
   setCode: (code) => set({ code }),
@@ -56,4 +62,6 @@ export const useArenaStore = create<ArenaState>((set) => ({
   setIsOpponentTyping: (isOpponentTyping) => set({ isOpponentTyping }),
   setIsConnected: (isConnected) => set({ isConnected }),
   setTestResult: (testResult) => set({ testResult }),
+  setGameMode: (gameMode) => set({ gameMode }),
+  setMatchOverResult: (matchOverResult) => set({ matchOverResult }),
 }));
