@@ -1,15 +1,24 @@
-import { useState } from 'react'
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import LandingPage from './pages/LandingPage';
+import LoginPage from './pages/LoginPage';
+import ArenaPage from './pages/ArenaPage';
+
+import DashboardPage from './pages/DashboardPage';
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4">
-      <h1 className="text-4xl font-bold mb-4">🚀 DevDuel</h1>
-      <p className="text-xl text-gray-400">Real-time 1v1 Competitive Programming</p>
-      <div className="mt-8 p-6 bg-gray-800 rounded-lg shadow-xl border border-gray-700">
-        <p className="text-green-400 font-mono">Status: Environment Ready</p>
-      </div>
-    </div>
-  )
+    <Router>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/arena" element={<ArenaPage />} />
+        {/* Catch all route */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Router>
+  );
 }
 
-export default App
+export default App;
