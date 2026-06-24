@@ -6,7 +6,7 @@ import { SOCKET_EVENTS } from '@devduel/shared';
 import { Terminal, XCircle, CheckCircle } from 'lucide-react';
 
 const CodeEditor: React.FC = () => {
-  const { code, language, setCode, matchId, userId, testResult } = useArenaStore();
+  const { code, language, setCode, setLanguage, supportedLanguages, matchId, userId, testResult } = useArenaStore();
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleChange = (value: string | undefined) => {
@@ -26,10 +26,25 @@ const CodeEditor: React.FC = () => {
 
   return (
     <div className="h-full w-full rounded-xl overflow-hidden relative z-0 flex flex-col" style={{ background: '#1e1e1e' }}>
+      <div className="h-12 bg-[#181818] border-b border-white/5 flex items-center px-4 shrink-0 shadow-sm z-10">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Language:</span>
+          <select 
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            className="bg-[#2d2d2d] text-gray-200 text-sm font-semibold rounded-lg px-3 py-1.5 border border-white/10 focus:outline-none focus:border-blue-500/50 hover:border-white/20 cursor-pointer transition-colors shadow-inner"
+          >
+            {supportedLanguages.map(lang => (
+              <option key={lang.id} value={lang.id}>{lang.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      
       <div className="flex-1 min-h-[50%] relative">
         <Editor
           height="100%"
-          defaultLanguage={language}
+          language={language}
           theme="vs-dark"
           value={code}
           onChange={handleChange}

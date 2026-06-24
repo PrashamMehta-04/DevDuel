@@ -1,15 +1,37 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import CodeEditor from '../components/CodeEditor';
 import MatchPanel from '../components/MatchPanel';
 import { socket } from '../socket';
 import { useArenaStore } from '../store/useArenaStore';
 import { SOCKET_EVENTS } from '@devduel/shared';
-import { Swords, Activity, Trophy, XCircle, ArrowRight } from 'lucide-react';
+import { Swords, Activity, Trophy, XCircle, ArrowRight, Clock } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 const ArenaPage: React.FC = () => {
   const navigate = useNavigate();
-  const { isConnected, setIsConnected, setIsOpponentTyping, setOpponentProgress, matchId, gameMode, matchOverResult, setMatchOverResult, userId } = useArenaStore();
+  const [timeLeft, setTimeLeft] = useState<string>('30:00');
+  const { isConnected, setIsConnected, setIsOpponentTyping, setOpponentProgress, matchId, gameMode, matchOverResult, setMatchOverResult, userId, matchEndTime } = useArenaStore();
+
+  useEffect(() => {
+    if (gameMode !== 'battle' || !matchEndTime) return;
+    
+    const updateTimer = () => {
+      const now = Date.now();
+      const diff = Math.max(0, matchEndTime - now);
+      
+      const minutes = Math.floor(diff / 60000);
+      const seconds = Math.floor((diff % 60000) / 1000);
+      setTimeLeft(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+      
+      if (diff === 0) {
+        clearInterval(interval);
+      }
+    };
+    
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [gameMode, matchEndTime]);
 
   useEffect(() => {
     function onConnect() {
@@ -84,12 +106,20 @@ const ArenaPage: React.FC = () => {
           </Link>
           <div className="flex items-center gap-4">
             {gameMode === 'battle' && (
-              <div className="flex items-center gap-2 px-4 py-1.5 glass-panel rounded-full border border-white/10 shadow-inner">
-                <Activity size={14} className={isConnected ? 'text-green-400 animate-pulse' : 'text-red-400'} />
-                <span className="text-xs font-semibold tracking-wider text-gray-300 uppercase">
-                  {isConnected ? 'Live Match' : 'Reconnecting...'}
-                </span>
-              </div>
+              <>
+                <div className="flex items-center gap-2 px-4 py-1.5 glass-panel rounded-full border border-white/10 shadow-inner bg-black/20">
+                  <Clock size={14} className="text-blue-400" />
+                  <span className="text-sm font-bold tracking-wider text-white font-mono">
+                    {timeLeft}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 px-4 py-1.5 glass-panel rounded-full border border-white/10 shadow-inner">
+                  <Activity size={14} className={isConnected ? 'text-green-400 animate-pulse' : 'text-red-400'} />
+                  <span className="text-xs font-semibold tracking-wider text-gray-300 uppercase">
+                    {isConnected ? 'Live Match' : 'Reconnecting...'}
+                  </span>
+                </div>
+              </>
             )}
           </div>
         </header>
@@ -149,6 +179,17 @@ const ArenaPage: React.FC = () => {
 
             <button
               onClick={() => {
+                const store = useArenaStore.getState();
+                if (matchOverResult.winnerId === store.userId) {
+                  store.setElo(store.elo + matchOverResult.winnerEloChange);
+                  store.setMatchesWon(store.matchesWon + 1);
+                } else if (matchOverResult.loserId === store.userId) {
+                  store.setElo(store.elo + matchOverResult.loserEloChange);
+                }
+                if (matchOverResult.winnerId || matchOverResult.loserId) {
+                  store.setMatchesPlayed(store.matchesPlayed + 1);
+                }
+                
                 setMatchOverResult(null);
                 navigate('/dashboard');
               }}

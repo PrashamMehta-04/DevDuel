@@ -9,7 +9,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev -w apps/backend & npm run dev -w apps/frontend",
+    "dev": "npm run dev -w apps/backend & npm run dev -w apps/frontend & npm run dev -w services/worker",
     "build": "npm run build --workspaces",
     "test": "npm test --workspaces"
   },

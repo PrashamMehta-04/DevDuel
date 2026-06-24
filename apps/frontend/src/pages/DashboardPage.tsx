@@ -1,19 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Swords, Code2, Trophy, Flame, Target, Users, Zap, Clock, Loader2 } from 'lucide-react';
+import { Swords, Code2, Trophy, Flame, Target, Users, Zap, Clock, Loader2, History } from 'lucide-react';
 import { useArenaStore } from '../store/useArenaStore';
 import { socket } from '../socket';
 import { SOCKET_EVENTS } from '@devduel/shared';
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { setGameMode, setMatchId, userId } = useArenaStore();
+  const { setGameMode, setMatchId, setMatchEndTime, userId, username, elo, matchesWon, setProblem } = useArenaStore();
   const [isSearching, setIsSearching] = useState(false);
+  const [isStartingSolo, setIsStartingSolo] = useState(false);
 
   useEffect(() => {
-    const onMatchFound = (payload: { matchId: string, opponentId: string }) => {
+    const onMatchFound = (payload: { matchId: string, opponentId: string, endTime: number, problem?: { title: string; description: string } }) => {
       setIsSearching(false);
       setMatchId(payload.matchId);
+      setMatchEndTime(payload.endTime);
+      if (payload.problem) {
+        setProblem(payload.problem);
+      }
       setGameMode('battle');
       navigate('/arena');
     };
@@ -26,7 +31,7 @@ const DashboardPage: React.FC = () => {
 
   const handleFindMatch = () => {
     setIsSearching(true);
-    socket.emit(SOCKET_EVENTS.FIND_MATCH, { userId, rating: 1450 }); // MVP rating
+    socket.emit(SOCKET_EVENTS.FIND_MATCH, { userId, rating: elo });
   };
 
   return (
@@ -46,13 +51,21 @@ const DashboardPage: React.FC = () => {
           <h1 className="text-xl font-black tracking-tight text-white">DEV<span className="text-gradient">DUEL</span></h1>
         </Link>
         <div className="flex items-center gap-4">
+          <Link to="/leaderboard" className="flex items-center gap-2 px-4 py-2 glass-panel rounded-full border border-white/5 hover:bg-white/10 transition-colors">
+            <Trophy size={16} className="text-yellow-400" />
+            <span className="text-sm font-bold text-gray-200">Leaderboard</span>
+          </Link>
+          <Link to="/history" className="flex items-center gap-2 px-4 py-2 glass-panel rounded-full border border-white/5 hover:bg-white/10 transition-colors">
+            <History size={16} className="text-blue-400" />
+            <span className="text-sm font-bold text-gray-200">History</span>
+          </Link>
           <div className="flex items-center gap-2 px-4 py-2 glass-panel rounded-full border border-white/5">
             <Flame size={16} className="text-orange-400" />
             <span className="text-sm font-bold text-gray-200">7 Day Streak</span>
           </div>
           <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 p-0.5 cursor-pointer hover:opacity-80 transition-opacity shadow-[0_0_15px_rgba(168,85,247,0.3)]">
             <div className="h-full w-full rounded-full bg-[#0B0F19] flex items-center justify-center">
-              <span className="text-sm font-bold text-gray-200">P1</span>
+              <span className="text-sm font-bold text-gray-200">{username.charAt(0).toUpperCase()}</span>
             </div>
           </div>
         </div>
@@ -61,7 +74,7 @@ const DashboardPage: React.FC = () => {
       {/* Main Content */}
       <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto p-8 flex flex-col gap-8 mt-4">
         <div>
-          <h2 className="text-3xl font-black tracking-tight mb-2">Welcome back, ProCoder123</h2>
+          <h2 className="text-3xl font-black tracking-tight mb-2">Welcome back, {username}</h2>
           <p className="text-gray-400 font-medium">Ready for your next coding challenge?</p>
         </div>
 
@@ -88,13 +101,25 @@ const DashboardPage: React.FC = () => {
               
               <div className="flex items-center gap-4 mt-4">
                 <button 
-                  onClick={() => {
+                  disabled={isStartingSolo}
+                  onClick={async () => {
+                    setIsStartingSolo(true);
+                    try {
+                      const res = await fetch('http://localhost:3001/api/problems/random');
+                      if (res.ok) {
+                        const problem = await res.json();
+                        setProblem(problem);
+                      }
+                    } catch (e) {
+                      console.error("Failed to fetch random problem", e);
+                    }
                     setGameMode('solo');
                     navigate('/arena');
                   }}
-                  className="bg-white hover:bg-gray-100 text-black px-6 py-3 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.4)] hover:-translate-y-0.5 flex items-center gap-2"
+                  className="bg-white hover:bg-gray-100 text-black px-6 py-3 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.4)] hover:-translate-y-0.5 flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
-                  <Code2 size={18} /> Solve Solo
+                  {isStartingSolo ? <Loader2 size={18} className="animate-spin" /> : <Code2 size={18} />}
+                  {isStartingSolo ? 'Loading...' : 'Solve Solo'}
                 </button>
                 <div className="flex items-center gap-2 text-sm text-gray-400 font-medium ml-2">
                   <Users size={16} /> <span className="text-gray-300 font-bold">12,453</span> solved today
@@ -134,12 +159,12 @@ const DashboardPage: React.FC = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-4">
           <div className="glass-panel rounded-2xl p-6 border border-white/5 flex flex-col items-center justify-center text-center hover:bg-white/[0.02] transition-colors">
             <Trophy size={28} className="text-yellow-400 mb-3 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]" />
-            <span className="text-3xl font-black text-white tracking-tight">1,450</span>
+            <span className="text-3xl font-black text-white tracking-tight">{elo}</span>
             <span className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Elo Rating</span>
           </div>
           <div className="glass-panel rounded-2xl p-6 border border-white/5 flex flex-col items-center justify-center text-center hover:bg-white/[0.02] transition-colors">
             <Swords size={28} className="text-blue-400 mb-3 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
-            <span className="text-3xl font-black text-white tracking-tight">42</span>
+            <span className="text-3xl font-black text-white tracking-tight">{matchesWon}</span>
             <span className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Matches Won</span>
           </div>
           <div className="glass-panel rounded-2xl p-6 border border-white/5 flex flex-col items-center justify-center text-center hover:bg-white/[0.02] transition-colors">

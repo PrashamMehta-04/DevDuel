@@ -114,19 +114,6 @@ const MatchPanel: React.FC = () => {
 
       {/* Controls */}
       <div className="glass-panel rounded-2xl p-5 flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Environment</label>
-          <select 
-            value={language}
-            onChange={(e) => setLanguage(e.target.value)}
-            className="bg-black/40 text-sm font-semibold text-blue-400 border border-white/10 rounded-lg px-4 py-2 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all shadow-inner appearance-none cursor-pointer"
-          >
-            {supportedLanguages.map((lang) => (
-              <option key={lang.id} value={lang.id} className="bg-gray-900">{lang.name}</option>
-            ))}
-          </select>
-        </div>
-
         <div className="flex gap-3">
           <button 
             onClick={handleRun}

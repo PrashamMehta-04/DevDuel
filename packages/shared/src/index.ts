@@ -57,6 +57,7 @@ export interface SubmissionPayload {
   code: string;
   language: string;
   type: 'run' | 'submit';
+  testCases?: any[]; // The tests to run against
 }
 
 export interface SubmissionResultPayload {
@@ -73,6 +74,11 @@ export interface MatchStartPayload {
   opponentId: string;
   startTime: number;
   endTime: number;
+  problem?: {
+    id: string;
+    title: string;
+    description: string;
+  };
 }
 
 export interface MatchOverPayload {

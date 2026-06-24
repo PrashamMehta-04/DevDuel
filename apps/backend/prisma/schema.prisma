@@ -10,6 +10,7 @@ datasource db {
 model User {
   id       String @id @default(uuid())
   username String @unique
+  password String
   elo      Int    @default(1200)
   matches  Match[]
 }
@@ -21,4 +22,12 @@ model Match {
   winnerId  String?
   createdAt DateTime @default(now())
   players   User[]
+}
+
+model Problem {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  difficulty  String   @default("EASY")
+  testCases   Json
 }
