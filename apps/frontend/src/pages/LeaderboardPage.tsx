@@ -15,7 +15,7 @@ const LeaderboardPage: React.FC = () => {
   const currentUserId = useArenaStore((state) => state.userId);
 
   useEffect(() => {
-    fetch('http://localhost:3001/api/leaderboard')
+    fetch('/api/leaderboard')
       .then(res => res.json())
       .then(data => {
         setUsers(data);

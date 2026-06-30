@@ -1,15 +1,63 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Swords, Code2, Trophy, Flame, Target, Users, Zap, Clock, Loader2, History } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Swords, Code2, Trophy, Flame, Target, Users, Zap, Clock, Loader2, History, LogOut } from 'lucide-react';
 import { useArenaStore } from '../store/useArenaStore';
 import { socket } from '../socket';
 import { SOCKET_EVENTS } from '@devduel/shared';
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { setGameMode, setMatchId, setMatchEndTime, userId, username, elo, matchesWon, setProblem } = useArenaStore();
+  const location = useLocation();
+  const { setGameMode, setMatchId, setMatchEndTime, userId, username, elo, matchesWon, setProblem, setUserId, setUsername, setElo, setMatchesWon, setMatchesPlayed } = useArenaStore();
   const [isSearching, setIsSearching] = useState(false);
   const [isStartingSolo, setIsStartingSolo] = useState(false);
+  const [userStats, setUserStats] = useState({ problemsSolved: 0, globalRank: 'Top 100%', streak: 0 });
+  const [globalStats, setGlobalStats] = useState({ solvedToday: 0 });
+  const [dailyProblem, setDailyProblem] = useState<{id: string, title: string, description: string} | null>(null);
+
+  useEffect(() => {
+    if (userId) {
+      fetch(`/api/users/${userId}/stats`, { cache: 'no-store' })
+        .then(res => res.json())
+        .then(data => {
+          if (!data.error) setUserStats(data);
+        })
+        .catch(console.error);
+    }
+    fetch('/api/stats/global', { cache: 'no-store' })
+      .then(res => res.json())
+      .then(data => {
+        if (!data.error) setGlobalStats(data);
+      })
+      .catch(console.error);
+  }, [userId]);
+
+  useEffect(() => {
+    fetch('/api/problems/daily')
+      .then(res => res.json())
+      .then(data => {
+        if (!data.error) setDailyProblem(data);
+      })
+      .catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    if (location.state?.isNewUser) {
+      navigate('/profile', { state: { isNewUser: true }, replace: true });
+    }
+  }, [location.state, navigate]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setUserId('');
+    setUsername('Guest');
+    setElo(1200);
+    setMatchesWon(0);
+    setMatchesPlayed(0);
+    navigate('/login');
+  };
+
+
 
   useEffect(() => {
     const onMatchFound = (payload: { matchId: string, opponentId: string, endTime: number, problem?: { title: string; description: string } }) => {
@@ -44,7 +92,7 @@ const DashboardPage: React.FC = () => {
 
       {/* Header */}
       <header className="relative z-10 glass-panel border-b border-white/5 px-8 py-4 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+        <Link to="/dashboard" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <div className="p-2 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-lg border border-white/10 shadow-[0_0_15px_rgba(59,130,246,0.3)]">
             <Swords size={20} className="text-blue-400" />
           </div>
@@ -61,13 +109,16 @@ const DashboardPage: React.FC = () => {
           </Link>
           <div className="flex items-center gap-2 px-4 py-2 glass-panel rounded-full border border-white/5">
             <Flame size={16} className="text-orange-400" />
-            <span className="text-sm font-bold text-gray-200">7 Day Streak</span>
+            <span className="text-sm font-bold text-gray-200">{userStats.streak} Day Streak</span>
           </div>
-          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 p-0.5 cursor-pointer hover:opacity-80 transition-opacity shadow-[0_0_15px_rgba(168,85,247,0.3)]">
+          <button onClick={handleLogout} className="p-2 glass-panel rounded-full border border-white/5 hover:bg-white/10 transition-colors" title="Logout">
+            <LogOut size={16} className="text-red-400" />
+          </button>
+          <Link to="/profile" className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 p-0.5 cursor-pointer hover:opacity-80 transition-opacity shadow-[0_0_15px_rgba(168,85,247,0.3)] block">
             <div className="h-full w-full rounded-full bg-[#0B0F19] flex items-center justify-center">
               <span className="text-sm font-bold text-gray-200">{username.charAt(0).toUpperCase()}</span>
             </div>
-          </div>
+          </Link>
         </div>
       </header>
 
@@ -93,9 +144,9 @@ const DashboardPage: React.FC = () => {
                     <Clock size={12} /> Ends in 14h
                   </div>
                 </div>
-                <h3 className="text-3xl font-bold mb-3 text-glow">Two Sum</h3>
-                <p className="text-gray-400 leading-relaxed max-w-xl text-sm font-medium">
-                  Given an array of integers <code className="text-blue-300">nums</code> and an integer <code className="text-blue-300">target</code>, return indices of the two numbers such that they add up to target. You may assume that each input would have exactly one solution...
+                <h3 className="text-3xl font-bold mb-3 text-glow">{dailyProblem ? dailyProblem.title : 'Loading...'}</h3>
+                <p className="text-gray-400 leading-relaxed max-w-xl text-sm font-medium line-clamp-3">
+                  {dailyProblem ? dailyProblem.description : ''}
                 </p>
               </div>
               
@@ -105,10 +156,13 @@ const DashboardPage: React.FC = () => {
                   onClick={async () => {
                     setIsStartingSolo(true);
                     try {
-                      const res = await fetch('http://localhost:3001/api/problems/random');
+                      const res = await fetch('/api/problems/two-sum');
                       if (res.ok) {
                         const problem = await res.json();
                         setProblem(problem);
+                        if (problem.id) {
+                          setMatchId(problem.id);
+                        }
                       }
                     } catch (e) {
                       console.error("Failed to fetch random problem", e);
@@ -122,7 +176,7 @@ const DashboardPage: React.FC = () => {
                   {isStartingSolo ? 'Loading...' : 'Solve Solo'}
                 </button>
                 <div className="flex items-center gap-2 text-sm text-gray-400 font-medium ml-2">
-                  <Users size={16} /> <span className="text-gray-300 font-bold">12,453</span> solved today
+                  <Users size={16} /> <span className="text-gray-300 font-bold">{globalStats.solvedToday.toLocaleString()}</span> solved today
                 </div>
               </div>
             </div>
@@ -169,17 +223,19 @@ const DashboardPage: React.FC = () => {
           </div>
           <div className="glass-panel rounded-2xl p-6 border border-white/5 flex flex-col items-center justify-center text-center hover:bg-white/[0.02] transition-colors">
             <Code2 size={28} className="text-green-400 mb-3 drop-shadow-[0_0_8px_rgba(74,222,128,0.5)]" />
-            <span className="text-3xl font-black text-white tracking-tight">128</span>
+            <span className="text-3xl font-black text-white tracking-tight">{userStats.problemsSolved}</span>
             <span className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Problems Solved</span>
           </div>
           <div className="glass-panel rounded-2xl p-6 border border-white/5 flex flex-col items-center justify-center text-center hover:bg-white/[0.02] transition-colors">
             <Target size={28} className="text-red-400 mb-3 drop-shadow-[0_0_8px_rgba(248,113,113,0.5)]" />
-            <span className="text-3xl font-black text-white tracking-tight">Top 5%</span>
+            <span className="text-3xl font-black text-white tracking-tight">{userStats.globalRank}</span>
             <span className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Global Rank</span>
           </div>
         </div>
 
       </main>
+
+
     </div>
   );
 };

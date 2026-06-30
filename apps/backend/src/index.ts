@@ -4,11 +4,13 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { Queue, QueueEvents } from 'bullmq';
-import IORedis from 'ioredis';
+import { Redis as IORedis } from 'ioredis';
 import { PrismaClient } from '@prisma/client';
-import { SOCKET_EVENTS, CodeUpdatePayload, SubmissionResultPayload, SubmissionPayload, MatchStartPayload, MatchOverPayload } from '@devduel/shared';
+import { SOCKET_EVENTS } from '@devduel/shared';
+import type { CodeUpdatePayload, SubmissionResultPayload, SubmissionPayload, MatchStartPayload, MatchOverPayload } from '@devduel/shared';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { OAuth2Client } from 'google-auth-library';
 
 dotenv.config();
 
@@ -54,21 +56,102 @@ async function seedProblems() {
         {
           id: 'two-sum',
           title: 'Two Sum',
-          description: 'Write a function twoSum(nums, target) that returns indices of the two numbers such that they add up to target.',
+          description: 'Write a function named `solution(nums, target)` that returns indices of the two numbers such that they add up to target. You may assume that each input would have exactly one solution, and you may not use the same element twice.',
           testCases: [
             { id: 1, isHidden: false, input: '[[2,7,11,15], 9]', expected: '[0,1]' },
             { id: 2, isHidden: false, input: '[[3,2,4], 6]', expected: '[1,2]' },
             { id: 3, isHidden: true, input: '[[3,3], 6]', expected: '[0,1]' },
-          ]
+            { id: 4, isHidden: true, input: '[[2,5,5,11], 10]', expected: '[1,2]' },
+          ],
+          defaultCode: {
+            python: 'def solution(nums, target):\n    # Write your code here\n    pass',
+            javascript: 'function solution(nums, target) {\n    // Write your code here\n    \n}'
+          }
         },
         {
           id: 'reverse-string',
           title: 'Reverse String',
-          description: 'Write a function reverseString(s) that reverses a string. The input string is given as an array of characters s.',
+          description: 'Write a function named `solution(s)` that reverses a string. The input string is given as an array of characters s. You must do this by modifying the input array in-place with O(1) extra memory, and returning the modified array.',
           testCases: [
             { id: 1, isHidden: false, input: '[["h","e","l","l","o"]]', expected: '["o","l","l","e","h"]' },
             { id: 2, isHidden: true, input: '[["H","a","n","n","a","h"]]', expected: '["h","a","n","n","a","H"]' },
-          ]
+          ],
+          defaultCode: {
+            python: 'def solution(s):\n    # Write your code here\n    pass',
+            javascript: 'function solution(s) {\n    // Write your code here\n    \n}'
+          }
+        },
+        {
+          id: 'valid-palindrome',
+          title: 'Valid Palindrome',
+          description: 'Write a function named `solution(s)` that returns true if a string is a palindrome, and false otherwise. A string is a palindrome when it reads the same forward and backward, ignoring non-alphanumeric characters and case.',
+          testCases: [
+            { id: 1, isHidden: false, input: '["A man, a plan, a canal: Panama"]', expected: 'true' },
+            { id: 2, isHidden: false, input: '["race a car"]', expected: 'false' },
+            { id: 3, isHidden: true, input: '[" "]', expected: 'true' },
+          ],
+          defaultCode: {
+            python: 'def solution(s):\n    # Write your code here\n    pass',
+            javascript: 'function solution(s) {\n    // Write your code here\n    \n}'
+          }
+        },
+        {
+          id: 'contains-duplicate',
+          title: 'Contains Duplicate',
+          description: 'Write a function named `solution(nums)` that returns true if any value appears at least twice in the array, and returns false if every element is distinct.',
+          testCases: [
+            { id: 1, isHidden: false, input: '[[1,2,3,1]]', expected: 'true' },
+            { id: 2, isHidden: false, input: '[[1,2,3,4]]', expected: 'false' },
+            { id: 3, isHidden: true, input: '[[1,1,1,3,3,4,3,2,4,2]]', expected: 'true' },
+          ],
+          defaultCode: {
+            python: 'def solution(nums):\n    # Write your code here\n    pass',
+            javascript: 'function solution(nums) {\n    // Write your code here\n    \n}'
+          }
+        },
+        {
+          id: 'fizz-buzz',
+          title: 'Fizz Buzz',
+          description: 'Write a function named `solution(n)` that returns an array of strings from 1 to n where: answer[i] == "FizzBuzz" if i is divisible by 3 and 5, answer[i] == "Fizz" if i is divisible by 3, answer[i] == "Buzz" if i is divisible by 5, and answer[i] == i (as a string) if none of the above conditions are true.',
+          testCases: [
+            { id: 1, isHidden: false, input: '[3]', expected: '["1","2","Fizz"]' },
+            { id: 2, isHidden: false, input: '[5]', expected: '["1","2","Fizz","4","Buzz"]' },
+            { id: 3, isHidden: true, input: '[15]', expected: '["1","2","Fizz","4","Buzz","Fizz","7","8","Fizz","Buzz","11","Fizz","13","14","FizzBuzz"]' },
+          ],
+          defaultCode: {
+            python: 'def solution(n):\n    # Write your code here\n    pass',
+            javascript: 'function solution(n) {\n    // Write your code here\n    \n}'
+          }
+        },
+        {
+          id: 'valid-parentheses',
+          title: 'Valid Parentheses',
+          description: 'Write a function named `solution(s)` that takes a string containing just the characters "(", ")", "{", "}", "[" and "]", and determines if the input string is valid. Open brackets must be closed by the same type of brackets, in the correct order.',
+          testCases: [
+            { id: 1, isHidden: false, input: '["()"]', expected: 'true' },
+            { id: 2, isHidden: false, input: '["()[]{}"]', expected: 'true' },
+            { id: 3, isHidden: false, input: '["(]"]', expected: 'false' },
+            { id: 4, isHidden: true, input: '["([)]"]', expected: 'false' },
+            { id: 5, isHidden: true, input: '["{[]}"]', expected: 'true' },
+          ],
+          defaultCode: {
+            python: 'def solution(s):\n    # Write your code here\n    pass',
+            javascript: 'function solution(s) {\n    // Write your code here\n    \n}'
+          }
+        },
+        {
+          id: 'missing-number',
+          title: 'Missing Number',
+          description: 'Write a function named `solution(nums)` that takes an array nums containing n distinct numbers in the range [0, n], and returns the only number in the range that is missing from the array.',
+          testCases: [
+            { id: 1, isHidden: false, input: '[[3,0,1]]', expected: '2' },
+            { id: 2, isHidden: false, input: '[[0,1]]', expected: '2' },
+            { id: 3, isHidden: true, input: '[[9,6,4,2,3,5,7,0,1]]', expected: '8' },
+          ],
+          defaultCode: {
+            python: 'def solution(nums):\n    # Write your code here\n    pass',
+            javascript: 'function solution(nums) {\n    // Write your code here\n    \n}'
+          }
         }
       ]
     });
@@ -80,7 +163,7 @@ seedProblems();
 app.get('/api/problems/random', async (req, res) => {
   try {
     const problems = await prisma.problem.findMany({
-      select: { id: true, title: true, description: true } // Don't send testCases to frontend
+      select: { id: true, title: true, description: true, defaultCode: true }
     });
     if (problems.length === 0) return res.status(404).json({ error: 'No problems found' });
     const randomProblem = problems[Math.floor(Math.random() * problems.length)];
@@ -88,6 +171,52 @@ app.get('/api/problems/random', async (req, res) => {
   } catch (error) {
     console.error('Random problem error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/problems/daily', async (req, res) => {
+  try {
+    // For now, hardcode "two-sum" as the daily problem, or pick one based on the day of the year
+    const problem = await prisma.problem.findUnique({
+      where: { id: 'two-sum' },
+      select: { id: true, title: true, description: true, defaultCode: true }
+    });
+    if (!problem) return res.status(404).json({ error: 'Daily problem not found' });
+    res.json(problem);
+  } catch (error) {
+    console.error('Daily problem error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/problems/:problemId', async (req, res) => {
+  try {
+    // Avoid conflicting with other routes like /random
+    if (req.params.problemId === 'random') return;
+
+    const problem = await prisma.problem.findUnique({
+      where: { id: req.params.problemId },
+      select: { id: true, title: true, description: true, defaultCode: true }
+    });
+    if (!problem) return res.status(404).json({ error: 'Problem not found' });
+    res.json(problem);
+  } catch (error) {
+    console.error('Fetch problem error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/problems/:problemId/submissions', async (req, res) => {
+  const userId = req.query.userId as string;
+  if (!userId) return res.status(400).json({ error: "Missing userId" });
+  try {
+    const submissions = await prisma.submission.findMany({
+      where: { problemId: req.params.problemId, userId },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(submissions);
+  } catch(e: any) {
+    res.status(500).json({ error: e.message });
   }
 });
 
@@ -126,7 +255,7 @@ app.post('/api/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({ data: { username, password: hashedPassword } });
     
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '12h' });
     
     res.json({ 
       id: user.id, username: user.username, elo: user.elo, 
@@ -148,13 +277,14 @@ app.post('/api/login', async (req, res) => {
     const user = await prisma.user.findUnique({ where: { username } });
     if (!user) return res.status(400).json({ error: 'Invalid credentials' });
     
+    if (!user.password) return res.status(400).json({ error: 'Please login with Google' });
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ error: 'Invalid credentials' });
     
     const matchesWon = await prisma.match.count({ where: { winnerId: user.id } });
     const matchesPlayed = await prisma.match.count({ where: { players: { some: { id: user.id } } } });
     
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '12h' });
     
     res.json({ 
       id: user.id, username: user.username, elo: user.elo, 
@@ -165,6 +295,182 @@ app.post('/api/login', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID || 'dummy-client-id');
+
+app.post('/api/auth/google', async (req, res) => {
+  const { credential } = req.body;
+  if (!credential) return res.status(400).json({ error: 'Credential is required' });
+
+  try {
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    if (!payload) return res.status(400).json({ error: 'Invalid Google token' });
+
+    const { sub: googleId, name, email } = payload;
+    let username = name?.replace(/\s+/g, '').toLowerCase() || 'user' + Math.floor(Math.random() * 10000);
+
+    let user = await prisma.user.findUnique({ where: { googleId } });
+    let isNewUser = false;
+
+    if (!user) {
+      isNewUser = true;
+      // Create user if they don't exist
+      // Make sure username is unique
+      let isUnique = false;
+      let suffix = '';
+      while (!isUnique) {
+        const existing = await prisma.user.findUnique({ where: { username: username + suffix } });
+        if (existing) {
+          suffix = Math.floor(Math.random() * 10000).toString();
+        } else {
+          isUnique = true;
+          username = username + suffix;
+        }
+      }
+
+      user = await prisma.user.create({
+        data: {
+          username,
+          googleId,
+          elo: 1200
+        }
+      });
+    }
+
+    const matchesWon = await prisma.match.count({ where: { winnerId: user.id } });
+    const matchesPlayed = await prisma.match.count({ where: { players: { some: { id: user.id } } } });
+    
+    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '12h' });
+    
+    res.json({ 
+      id: user.id, username: user.username, elo: user.elo, 
+      matchesWon, matchesPlayed, token, isNewUser 
+    });
+
+  } catch (error) {
+    console.error('Google login error:', error);
+    res.status(500).json({ error: 'Failed to authenticate with Google' });
+  }
+});
+
+app.put('/api/auth/profile', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
+  
+  const token = authHeader.split(' ')[1] || authHeader;
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
+    const { username } = req.body;
+    
+    if (!username) return res.status(400).json({ error: 'Username required' });
+    if (username.length < 3) return res.status(400).json({ error: 'Username must be at least 3 characters' });
+    
+    const existing = await prisma.user.findUnique({ where: { username } });
+    if (existing && existing.id !== decoded.userId) {
+      return res.status(400).json({ error: 'Username already taken' });
+    }
+    
+    const user = await prisma.user.update({
+      where: { id: decoded.userId },
+      data: { username }
+    });
+    
+    res.json({ success: true, username: user.username });
+  } catch (error) {
+    console.error('Profile update error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/users/:userId/stats', async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const totalUsers = await prisma.user.count();
+    const rankNum = await prisma.user.count({ where: { elo: { gt: user.elo } } }) + 1;
+    let globalRank = Math.ceil((rankNum / totalUsers) * 100);
+    if (globalRank < 1) globalRank = 1;
+
+    const acceptedSubmissions = await prisma.submission.findMany({
+      where: { userId, status: 'Accepted' },
+      select: { createdAt: true, problemId: true },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const solvedProblems = new Set(acceptedSubmissions.map(s => s.problemId)).size;
+
+    // Calculate streak
+    let streak = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let currentDate = new Date(today);
+
+    // Group submissions by day
+    const solveDays = new Set(
+      acceptedSubmissions.map(s => {
+        const d = new Date(s.createdAt);
+        d.setHours(0, 0, 0, 0);
+        return d.getTime();
+      })
+    );
+
+    // Check if solved today, if not, check yesterday to keep streak active
+    if (solveDays.has(currentDate.getTime())) {
+      streak = 1;
+      currentDate.setDate(currentDate.getDate() - 1);
+    } else {
+      currentDate.setDate(currentDate.getDate() - 1);
+      if (solveDays.has(currentDate.getTime())) {
+        streak = 1;
+        currentDate.setDate(currentDate.getDate() - 1);
+      }
+    }
+
+    if (streak > 0) {
+      while (solveDays.has(currentDate.getTime())) {
+        streak++;
+        currentDate.setDate(currentDate.getDate() - 1);
+      }
+    }
+
+    res.json({
+      problemsSolved: solvedProblems,
+      globalRank: `Top ${globalRank}%`,
+      streak
+    });
+  } catch (error) {
+    console.error('User stats error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/stats/global', async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const uniqueSolves = await prisma.submission.findMany({
+      where: {
+        status: 'Accepted',
+        createdAt: { gte: today }
+      },
+      distinct: ['userId', 'problemId'],
+      select: { id: true }
+    });
+    const solvedToday = uniqueSolves.length;
+    
+    res.json({ solvedToday });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 
 app.get('/api/leaderboard', async (req, res) => {
   try {
@@ -315,6 +621,22 @@ queueEvents.on('completed', async ({ jobId }) => {
     const result = job.returnvalue as SubmissionResultPayload;
     console.log(`[Backend] Broadcasting result to match ${result.matchId}. Success: ${result.success}`);
     
+    if (job.data && job.data.type === 'submit' && job.data.problemId) {
+      try {
+        await prisma.submission.create({
+          data: {
+            userId: result.userId,
+            problemId: job.data.problemId,
+            code: job.data.code,
+            language: job.data.language,
+            status: result.success ? "Accepted" : (result.results?.find(r => r.error)?.error ? "Runtime Error" : "Wrong Answer"),
+          }
+        });
+      } catch (err) {
+        console.error(`[Backend] Failed to save submission:`, err);
+      }
+    }
+
     const match = activeMatches[result.matchId];
     if (match && match.players[result.userId]) {
       const player = match.players[result.userId];
@@ -399,8 +721,8 @@ io.on('connection', (socket) => {
         timer: setTimeout(() => endMatch(matchId, 'Time expired'), MATCH_DURATION)
       };
 
-      const startPayload1: MatchStartPayload = { matchId, opponentId: opponent.userId, startTime, endTime, problem: { id: randomProblem.id, title: randomProblem.title, description: randomProblem.description } };
-      const startPayload2: MatchStartPayload = { matchId, opponentId: payload.userId, startTime, endTime, problem: { id: randomProblem.id, title: randomProblem.title, description: randomProblem.description } };
+      const startPayload1: MatchStartPayload = { matchId, opponentId: opponent.userId, startTime, endTime, problem: { id: randomProblem.id, title: randomProblem.title, description: randomProblem.description, defaultCode: randomProblem.defaultCode as any } };
+      const startPayload2: MatchStartPayload = { matchId, opponentId: payload.userId, startTime, endTime, problem: { id: randomProblem.id, title: randomProblem.title, description: randomProblem.description, defaultCode: randomProblem.defaultCode as any } };
 
       // Notify both players
       io.to(socket.id).emit(SOCKET_EVENTS.MATCH_FOUND, startPayload1);
@@ -480,7 +802,7 @@ io.on('connection', (socket) => {
             botInterval
           };
 
-          io.to(player.socketId).emit(SOCKET_EVENTS.MATCH_FOUND, { matchId, opponentId: botId, startTime, endTime, problem: { id: randomProblem.id, title: randomProblem.title, description: randomProblem.description } });
+          io.to(player.socketId).emit(SOCKET_EVENTS.MATCH_FOUND, { matchId, opponentId: botId, startTime, endTime, problem: { id: randomProblem.id, title: randomProblem.title, description: randomProblem.description, defaultCode: randomProblem.defaultCode as any } });
         }
       }, 15000); // 15 seconds wait
     }
@@ -499,13 +821,40 @@ io.on('connection', (socket) => {
     console.log(`[Socket] 🚀 Received ${payload.type.toUpperCase()} from ${payload.userId}`);
     
     try {
+      let problemId = activeMatches[payload.matchId]?.problem?.id;
+      let testCases = activeMatches[payload.matchId]?.problem?.testCases || [];
+
+      if (!problemId) {
+         // In Daily Problem mode, matchId might be the problemId itself
+         let searchId = payload.matchId;
+         if (searchId === 'demo-match') searchId = 'two-sum';
+         
+         let problem = await prisma.problem.findUnique({
+           where: { id: searchId }
+         });
+         
+         if (!problem && searchId !== 'two-sum') {
+            problem = await prisma.problem.findUnique({ where: { id: 'two-sum' } });
+         }
+
+         if (problem) {
+            problemId = problem.id;
+            testCases = problem.testCases as any[];
+         } else {
+            console.error(`[Socket] ❌ Could not find problem for matchId: ${payload.matchId}`);
+            socket.emit(SOCKET_EVENTS.TEST_RESULT, { userId: payload.userId, success: false, results: [], error: 'Problem not found' });
+            return;
+         }
+      }
+
       const job = await executionQueue.add('execute', {
         matchId: payload.matchId,
         userId: payload.userId,
         code: payload.code,
         language: payload.language,
         type: payload.type,
-        testCases: activeMatches[payload.matchId]?.problem?.testCases || []
+        problemId: problemId,
+        testCases: testCases
       });
       console.log(`[Queue] 🎟️  Job added to queue with ID: ${job.id}`);
     } catch (err) {

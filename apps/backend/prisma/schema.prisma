@@ -10,9 +10,11 @@ datasource db {
 model User {
   id       String @id @default(uuid())
   username String @unique
-  password String
+  password String?
+  googleId String? @unique
   elo      Int    @default(1200)
   matches  Match[]
+  submissions Submission[]
 }
 
 model Match {
@@ -30,4 +32,18 @@ model Problem {
   description String
   difficulty  String   @default("EASY")
   testCases   Json
+  defaultCode Json?
+  submissions Submission[]
+}
+
+model Submission {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  problemId   String
+  problem     Problem  @relation(fields: [problemId], references: [id])
+  code        String
+  language    String
+  status      String
+  createdAt   DateTime @default(now())
 }

@@ -1,8 +1,8 @@
 import { Worker, Job } from 'bullmq';
-import IORedis from 'ioredis';
+import { Redis as IORedis } from 'ioredis';
 import Docker from 'dockerode';
 import dotenv from 'dotenv';
-import { SubmissionResultPayload, TestResult, SubmissionPayload } from '@devduel/shared';
+import type { SubmissionResultPayload, TestResult, SubmissionPayload } from '@devduel/shared';
 import { Readable } from 'stream';
 
 dotenv.config();
@@ -26,9 +26,9 @@ for inp in inputs:
     try:
         args = json.loads(inp)
         result = solution(*args)
-        print(json.dumps(result, separators=(',', ':')))
+        print("@@RESULT@@" + json.dumps(result, separators=(',', ':')))
     except Exception as e:
-        print("Error:", str(e))
+        print("@@RESULT@@Error:", str(e))
 `;
       return ['sh', '-c', `echo $WRAPPER_B64 | base64 -d | python`];
     },
@@ -44,9 +44,9 @@ for (const inp of inputs) {
     try {
         const args = JSON.parse(inp);
         const result = solution(...args);
-        console.log(JSON.stringify(result));
+        console.log("@@RESULT@@" + JSON.stringify(result));
     } catch (e) {
-        console.log("Error:", e.message);
+        console.log("@@RESULT@@Error:", e.message);
     }
 }
 `;
@@ -56,25 +56,76 @@ for (const inp of inputs) {
   cpp: {
     image: 'gcc:12',
     getCmd: (code, inputs) => {
-      // For C++, we just run the code once per test case via a bash script
-      const testCasesArray = inputs.map(i => `'${i.replace(/'/g, "'\\''")}'`).join(' ');
-      return ['sh', '-c', `echo $CODE_B64 | base64 -d > source.cpp && g++ source.cpp && for inp in ${testCasesArray}; do ./a.out "$inp"; done`];
+      return ['sh', '-c', `echo $WRAPPER_B64 | base64 -d > source.cpp && g++ source.cpp && ./a.out`];
     },
   },
   java: {
     image: 'eclipse-temurin:17-jdk',
     getCmd: (code, inputs) => {
-      const testCasesArray = inputs.map(i => `'${i.replace(/'/g, "'\\''")}'`).join(' ');
-      return ['sh', '-c', `echo $CODE_B64 | base64 -d > Solution.java && javac Solution.java && for inp in ${testCasesArray}; do java Solution "$inp"; done`];
+      return ['sh', '-c', `echo $WRAPPER_B64 | base64 -d > Solution.java && echo $MAIN_B64 | base64 -d > Main.java && javac Solution.java Main.java && java Main`];
     },
   },
 };
 
+const PROBLEM_TYPES: Record<string, { args: string[], ret: string }> = {
+  'two-sum': { args: ['vector<int>', 'int'], ret: 'vector<int>' },
+  'reverse-string': { args: ['vector<string>'], ret: 'vector<string>' },
+  'valid-palindrome': { args: ['string'], ret: 'bool' },
+  'contains-duplicate': { args: ['vector<int>'], ret: 'bool' },
+  'fizz-buzz': { args: ['int'], ret: 'vector<string>' },
+  'valid-parentheses': { args: ['string'], ret: 'bool' },
+  'missing-number': { args: ['vector<int>'], ret: 'int' },
+};
+
+function toCppVal(val: any, type: string): string {
+  if (type === 'int') return val.toString();
+  if (type === 'bool') return val ? 'true' : 'false';
+  if (type === 'string') return `"${val}"`;
+  if (type === 'vector<int>') return `std::vector<int>{${val.join(',')}}`;
+  if (type === 'vector<string>') return `std::vector<std::string>{${val.map((v: string) => `"${v}"`).join(',')}}`;
+  return '';
+}
+
+function cppPrint(varName: string, type: string): string {
+  if (type === 'int') return `std::cout << "@@RESULT@@" << ${varName} << std::endl;`;
+  if (type === 'bool') return `std::cout << "@@RESULT@@" << (${varName} ? "true" : "false") << std::endl;`;
+  if (type === 'string') return `std::cout << "@@RESULT@@\\"" << ${varName} << "\\"" << std::endl;`;
+  if (type === 'vector<int>') return `std::cout << "@@RESULT@@["; for(int j=0; j<${varName}.size(); j++) { std::cout << ${varName}[j]; if(j<${varName}.size()-1) std::cout << ","; } std::cout << "]" << std::endl;`;
+  if (type === 'vector<string>') return `std::cout << "@@RESULT@@["; for(int j=0; j<${varName}.size(); j++) { std::cout << "\\"" << ${varName}[j] << "\\""; if(j<${varName}.size()-1) std::cout << ","; } std::cout << "]" << std::endl;`;
+  return '';
+}
+
+function toJavaVal(val: any, type: string): string {
+  if (type === 'int') return val.toString();
+  if (type === 'bool') return val ? 'true' : 'false';
+  if (type === 'string') return `"${val}"`;
+  if (type === 'vector<int>') return `new int[]{${val.join(',')}}`;
+  if (type === 'vector<string>') return `new String[]{${val.map((v: string) => `"${v}"`).join(',')}}`;
+  return '';
+}
+
+function javaType(type: string): string {
+  if (type === 'vector<int>') return 'int[]';
+  if (type === 'vector<string>') return 'String[]';
+  if (type === 'string') return 'String';
+  if (type === 'bool') return 'boolean';
+  return type;
+}
+
+function javaPrint(varName: string, type: string): string {
+  if (type === 'int') return `System.out.println("@@RESULT@@" + ${varName});`;
+  if (type === 'bool') return `System.out.println("@@RESULT@@" + ${varName});`;
+  if (type === 'string') return `System.out.println("@@RESULT@@\\"" + ${varName} + "\\"");`;
+  if (type === 'vector<int>') return `System.out.print("@@RESULT@@["); for(int j=0; j<${varName}.length; j++) { System.out.print(${varName}[j]); if(j<${varName}.length-1) System.out.print(","); } System.out.println("]");`;
+  if (type === 'vector<string>') return `System.out.print("@@RESULT@@["); for(int j=0; j<${varName}.length; j++) { System.out.print("\\"" + ${varName}[j] + "\\""); if(j<${varName}.length-1) System.out.print(","); } System.out.println("]");`;
+  return '';
+}
+
 const worker = new Worker(
   'code-execution',
   async (job: Job<SubmissionPayload>) => {
-    const { matchId, userId, code, language, type, testCases } = job.data;
-    console.log(`\\n[Worker] 🛠️  Processing ${type.toUpperCase()} for User: ${userId}`);
+    const { matchId, userId, code, language, type, testCases, problemId } = job.data;
+    console.log(`\n[Worker] 🛠️  Processing ${type.toUpperCase()} for User: ${userId}`);
 
     const config = RUNTIME_CONFIG[language];
     if (!config) throw new Error(`Language ${language} not supported.`);
@@ -90,17 +141,42 @@ const worker = new Worker(
       console.log(`[Worker] 📦 Creating container: ${config.image}`);
       
       const inputs = activeTests.map(t => t.input);
-      
-      // Generate wrapper based on language
       let wrapperCode = code;
+      let mainCode = '';
+      const sig = PROBLEM_TYPES[problemId || 'two-sum'];
+      
       if (language === 'python') {
-         wrapperCode = `import json\\nimport sys\\n${code}\\n\\ninputs = json.loads('''${JSON.stringify(inputs)}''')\\nfor inp in inputs:\\n    try:\\n        args = json.loads(inp)\\n        result = solution(*args)\\n        print(json.dumps(result, separators=(',', ':')))\\n    except Exception as e:\\n        print("Error:", str(e))`;
+         wrapperCode = `import json\nimport sys\n${code}\n\ninputs = json.loads('''${JSON.stringify(inputs)}''')\nfor inp in inputs:\n    try:\n        args = json.loads(inp)\n        result = solution(*args)\n        print("@@RESULT@@" + json.dumps(result, separators=(',', ':')))\n    except Exception as e:\n        print("@@RESULT@@Error:", str(e))`;
       } else if (language === 'javascript') {
-         wrapperCode = `${code}\\n\\nconst inputs = JSON.parse(\`${JSON.stringify(inputs).replace(/\\/g, '\\\\').replace(/`/g, '\\`')}\`);\\nfor (const inp of inputs) {\\n    try {\\n        const args = JSON.parse(inp);\\n        const result = solution(...args);\\n        console.log(JSON.stringify(result));\\n    } catch (e) {\\n        console.log("Error:", e.message);\\n    }\\n}`;
+         wrapperCode = `${code}\n\nconst inputs = JSON.parse(\`${JSON.stringify(inputs).replace(/\\/g, '\\\\').replace(/`/g, '\\`')}\`);\nfor (const inp of inputs) {\n    try {\n        const args = JSON.parse(inp);\n        const result = solution(...args);\n        console.log("@@RESULT@@" + JSON.stringify(result));\n    } catch (e) {\n        console.log("@@RESULT@@Error:", e.message);\n    }\n}`;
+      } else if (language === 'cpp') {
+         let mainBody = '\n#include <iostream>\n#include <vector>\n#include <string>\nint main() {\n';
+         for (let i = 0; i < inputs.length; i++) {
+           const args = JSON.parse(inputs[i]);
+           mainBody += `    try {\n`;
+           const argNames = [];
+           for (let j = 0; j < args.length; j++) {
+             const cppType = sig.args[j].replace(/vector/g, 'std::vector').replace(/string/g, 'std::string');
+             mainBody += `        ${cppType} arg${j} = ${toCppVal(args[j], sig.args[j])};\n`;
+             argNames.push(`arg${j}`);
+           }
+           mainBody += `        auto res = solution(${argNames.join(', ')});\n        ${cppPrint('res', sig.ret)}\n    } catch(...) { std::cout << "@@RESULT@@Error" << std::endl; }\n`;
+         }
+         mainBody += '    return 0;\n}\n';
+         wrapperCode = code + mainBody;
+      } else if (language === 'java') {
+         mainCode = `class Main {\n    public static void main(String[] args) {\n        Solution sol = new Solution();\n`;
+         for (let i = 0; i < inputs.length; i++) {
+           const args = JSON.parse(inputs[i]);
+           const javaArgs = args.map((a: any, idx: number) => toJavaVal(a, sig.args[idx])).join(', ');
+           mainCode += `        try { ${javaType(sig.ret)} res = sol.solution(${javaArgs}); ${javaPrint('res', sig.ret)} } catch(Exception e) { System.out.println("@@RESULT@@Error: " + e.getMessage()); }\n`;
+         }
+         mainCode += '    }\n}\n';
       }
       
       const wrapperBase64 = Buffer.from(wrapperCode).toString('base64');
       const base64Code = Buffer.from(code).toString('base64');
+      const mainBase64 = Buffer.from(mainCode).toString('base64');
       
       const cmd = config.getCmd(code, inputs);
 
@@ -109,7 +185,7 @@ const worker = new Worker(
         Cmd: cmd,
         AttachStdout: true,
         AttachStderr: true,
-        Env: [`CODE_B64=${base64Code}`, `WRAPPER_B64=${wrapperBase64}`],
+        Env: [`CODE_B64=${base64Code}`, `WRAPPER_B64=${wrapperBase64}`, `MAIN_B64=${mainBase64}`],
         HostConfig: {
           Memory: 128 * 1024 * 1024,
           NetworkMode: 'none',
@@ -138,24 +214,55 @@ const worker = new Worker(
       
       // Docker output streams have headers (8 bytes) per chunk. We strip them roughly by parsing lines and filtering out garbage if needed.
       // A more robust way is using docker-modem stream parsing, but for now we'll do simple text cleanup.
-      const cleanOutput = output.replace(/[\\u0000-\\u001F\\u007F-\\u009F]/g, "\\n").split("\\n").filter(l => l.trim() !== "");
+      const cleanOutput = output.replace(/[\u0000-\u001F\u007F-\u009F]/g, "\n").split("\n").filter(l => l.trim() !== "");
       
       console.log(`[Worker] ✅ Execution finished. Raw Output Lines: ${cleanOutput.length}`);
+      console.log(`[Worker] 📝 Output snippet:`, cleanOutput.slice(0, 10));
+
+      const resultLines = cleanOutput.filter(l => l.includes('@@RESULT@@'));
+      const hasExecutionError = resultLines.length === 0 && cleanOutput.length > 0;
+      const rawErrorOutput = hasExecutionError ? cleanOutput.slice(0, 10).join('\n') : '';
 
       for (let i = 0; i < activeTests.length; i++) {
         const test = activeTests[i];
-        const actualOut = cleanOutput[i] ? cleanOutput[i].trim() : '';
-        const passed = actualOut === test.expected.trim();
+        const actualOut = resultLines[i] ? resultLines[i].substring(resultLines[i].indexOf('@@RESULT@@') + 10).trim() : '';
+        
+        let passed = false;
+        try {
+          const parsedActual = JSON.parse(actualOut);
+          const parsedExpected = JSON.parse(test.expected);
+          
+          if (problemId === 'two-sum' && Array.isArray(parsedActual) && Array.isArray(parsedExpected)) {
+            passed = JSON.stringify([...parsedActual].sort()) === JSON.stringify([...parsedExpected].sort());
+          } else {
+            passed = JSON.stringify(parsedActual) === JSON.stringify(parsedExpected);
+          }
+        } catch (e) {
+          passed = actualOut === test.expected.trim();
+        }
+        
         if (passed) passedCount++;
+
+        let errorMsg = undefined;
+        if (!passed) {
+          if (hasExecutionError) {
+             errorMsg = 'Compiler/Runtime Error:\n' + rawErrorOutput;
+          } else if (actualOut.toLowerCase().includes('error')) {
+             errorMsg = actualOut;
+          } else {
+             errorMsg = 'Wrong Answer';
+          }
+        }
 
         testResults.push({
           testCaseId: test.id,
           passed,
           output: test.isHidden ? '[Hidden]' : actualOut,
-          error: passed ? undefined : (actualOut.toLowerCase().includes('error') ? actualOut : 'Wrong Answer'),
+          error: errorMsg,
           expected: test.expected,
           executionTime: 0,
-          isHidden: test.isHidden
+          isHidden: test.isHidden,
+          input: test.isHidden ? undefined : test.input
         });
       }
 
@@ -170,7 +277,8 @@ const worker = new Worker(
            output: '',
            expected: test.expected,
            executionTime: 0,
-           isHidden: test.isHidden
+           isHidden: test.isHidden,
+           input: test.isHidden ? undefined : test.input
          });
       }
     } finally {

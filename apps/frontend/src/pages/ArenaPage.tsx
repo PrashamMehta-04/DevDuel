@@ -98,7 +98,7 @@ const ArenaPage: React.FC = () => {
       <div className="relative z-10 flex flex-col h-full">
         {/* Header */}
         <header className="h-16 glass-panel border-b-0 border-white/5 flex items-center justify-between px-8 flex-shrink-0 mb-4 mx-4 mt-4 rounded-2xl">
-          <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+          <Link to="/dashboard" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <div className="p-2 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-lg border border-white/10 shadow-[0_0_15px_rgba(59,130,246,0.3)]">
               <Swords size={20} className="text-blue-400" />
             </div>

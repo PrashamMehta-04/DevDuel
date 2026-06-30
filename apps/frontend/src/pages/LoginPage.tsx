@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Swords, ArrowRight, Loader2, Key } from 'lucide-react';
 import { useArenaStore } from '../store/useArenaStore';
+import { GoogleLogin } from '@react-oauth/google';
 
 const LoginPage: React.FC = () => {
   const [username, setUsernameInput] = useState('');
@@ -11,6 +12,35 @@ const LoginPage: React.FC = () => {
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const { setUserId, setUsername, setElo, setMatchesWon, setMatchesPlayed } = useArenaStore();
+
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: credentialResponse.credential }),
+      });
+      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to authenticate');
+      
+      localStorage.setItem('token', data.token);
+      setUserId(data.id);
+      setUsername(data.username);
+      setElo(data.elo);
+      setMatchesWon(data.matchesWon);
+      setMatchesPlayed(data.matchesPlayed);
+      
+      navigate('/dashboard', { state: { isNewUser: data.isNewUser } });
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,7 +54,7 @@ const LoginPage: React.FC = () => {
     
     try {
       const endpoint = isRegistering ? '/api/register' : '/api/login';
-      const res = await fetch(`http://localhost:3001${endpoint}`, {
+      const res = await fetch(`/api${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: username.trim(), password: password.trim() }),
@@ -136,6 +166,22 @@ const LoginPage: React.FC = () => {
               >
                 {isRegistering ? 'Already have an account? Log in' : "Don't have an account? Sign up"}
               </button>
+            </div>
+
+            <div className="flex items-center my-6">
+              <div className="flex-grow border-t border-white/10"></div>
+              <span className="px-3 text-sm text-gray-400">Or continue with</span>
+              <div className="flex-grow border-t border-white/10"></div>
+            </div>
+
+            <div className="flex justify-center">
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => setError('Google Login Failed')}
+                theme="filled_black"
+                shape="pill"
+                text="continue_with"
+              />
             </div>
           </form>
         </div>

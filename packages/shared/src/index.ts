@@ -49,6 +49,7 @@ export interface TestResult {
   error?: string;
   executionTime: number;
   isHidden: boolean;
+  input?: string;
 }
 
 export interface SubmissionPayload {
@@ -57,6 +58,7 @@ export interface SubmissionPayload {
   code: string;
   language: string;
   type: 'run' | 'submit';
+  problemId?: string;
   testCases?: any[]; // The tests to run against
 }
 
@@ -78,6 +80,7 @@ export interface MatchStartPayload {
     id: string;
     title: string;
     description: string;
+    defaultCode?: Record<string, string>;
   };
 }
 

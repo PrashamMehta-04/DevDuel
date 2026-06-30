@@ -39,7 +39,7 @@ const AdminPage: React.FC = () => {
     
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:3001/api/problems', {
+      const res = await fetch('/api/problems', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

@@ -19,7 +19,7 @@ const HistoryPage: React.FC = () => {
   useEffect(() => {
     if (!currentUserId) return;
     
-    fetch(`http://localhost:3001/api/users/${currentUserId}/matches`)
+    fetch(`/api/users/${currentUserId}/matches`)
       .then(res => res.json())
       .then(data => {
         setMatches(data);
