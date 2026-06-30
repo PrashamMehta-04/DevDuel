@@ -15,6 +15,8 @@ const ArenaPage: React.FC = () => {
   useEffect(() => {
     if (gameMode !== 'battle' || !matchEndTime) return;
     
+    let interval: ReturnType<typeof setInterval>;
+    
     const updateTimer = () => {
       const now = Date.now();
       const diff = Math.max(0, matchEndTime - now);
@@ -23,13 +25,13 @@ const ArenaPage: React.FC = () => {
       const seconds = Math.floor((diff % 60000) / 1000);
       setTimeLeft(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
       
-      if (diff === 0) {
+      if (diff === 0 && interval) {
         clearInterval(interval);
       }
     };
     
     updateTimer();
-    const interval = setInterval(updateTimer, 1000);
+    interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
   }, [gameMode, matchEndTime]);
 

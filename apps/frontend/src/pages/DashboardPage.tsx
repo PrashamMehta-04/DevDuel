@@ -140,9 +140,6 @@ const DashboardPage: React.FC = () => {
                   <div className="px-3 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-bold rounded-full border border-yellow-500/30 flex items-center gap-1.5 shadow-[0_0_10px_rgba(234,179,8,0.2)]">
                     <Target size={12} /> Problem of the Day
                   </div>
-                  <div className="px-3 py-1 bg-blue-500/20 text-blue-400 text-xs font-bold rounded-full border border-blue-500/30 flex items-center gap-1.5 shadow-[0_0_10px_rgba(59,130,246,0.2)]">
-                    <Clock size={12} /> Ends in 14h
-                  </div>
                 </div>
                 <h3 className="text-3xl font-bold mb-3 text-glow">{dailyProblem ? dailyProblem.title : 'Loading...'}</h3>
                 <p className="text-gray-400 leading-relaxed max-w-xl text-sm font-medium line-clamp-3">

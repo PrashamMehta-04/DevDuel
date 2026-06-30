@@ -100,10 +100,6 @@ const MatchPanel: React.FC = () => {
                 </div>
                 <h2 className="text-xl font-bold tracking-tight text-glow">{problem.title}</h2>
               </div>
-              <div className="glass-panel px-3 py-1.5 rounded-lg border border-white/5 flex items-center gap-2">
-                <Clock size={14} className="text-gray-400" />
-                <span className="text-sm font-mono font-medium text-gray-200">12:45</span>
-              </div>
             </div>
 
             <p className="text-gray-300 text-sm leading-relaxed z-10 font-medium">

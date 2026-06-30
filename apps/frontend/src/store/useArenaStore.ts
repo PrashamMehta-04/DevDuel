@@ -34,6 +34,8 @@ interface ArenaState {
   setIsConnected: (connected: boolean) => void;
   setMatchEndTime: (time: number | null) => void;
   setProblem: (problem: { title: string; description: string; defaultCode?: Record<string, string> }) => void;
+  defaultLanguage: string;
+  setDefaultLanguage: (lang: string) => void;
   testResult: any | null;
   setTestResult: (result: any | null) => void;
   gameMode: 'solo' | 'battle';
@@ -63,6 +65,7 @@ export const useArenaStore = create<ArenaState>()(
       matchesPlayed: 0,
       code: 'def solution(nums, target):\n    # Write your code here\n    pass',
       language: 'python',
+      defaultLanguage: 'javascript',
       supportedLanguages: LANGUAGES,
       problem: {
         id: 'two-sum',
@@ -95,14 +98,15 @@ export const useArenaStore = create<ArenaState>()(
         const code = problem.defaultCode?.[lang] || LANGUAGES.find(l => l.id === lang)?.defaultCode || '';
         set({ language: lang, code });
       },
+      setDefaultLanguage: (lang) => set({ defaultLanguage: lang }),
       setOpponentProgress: (progress) => set({ opponentProgress: progress }),
       setIsOpponentTyping: (isOpponentTyping) => set({ isOpponentTyping }),
       setIsConnected: (isConnected) => set({ isConnected }),
       setMatchEndTime: (matchEndTime) => set({ matchEndTime }),
       setProblem: (problem) => {
-        const lang = get().language;
+        const lang = get().defaultLanguage;
         const code = problem.defaultCode?.[lang] || LANGUAGES.find(l => l.id === lang)?.defaultCode || '';
-        set({ problem, code });
+        set({ problem, code, language: lang });
       },
       setTestResult: (testResult) => set({ testResult, isExecuting: false }),
       setGameMode: (gameMode) => set({ gameMode }),
@@ -118,6 +122,11 @@ export const useArenaStore = create<ArenaState>()(
         elo: state.elo,
         matchesWon: state.matchesWon,
         matchesPlayed: state.matchesPlayed,
+        gameMode: state.gameMode,
+        matchId: state.matchId,
+        matchEndTime: state.matchEndTime,
+        problem: state.problem,
+        defaultLanguage: state.defaultLanguage,
       }),
     }
   )

@@ -564,7 +564,7 @@ async function endMatch(matchId: string, reason: string) {
             id: matchId,
             status: 'COMPLETED',
             problemId: 'two-sum',
-            winnerId: winnerId && !winnerId.startsWith('Bot_') ? winnerId : null,
+            winnerId: winnerId,
             players: {
               connect: realPlayers.map(id => ({ id }))
             }

@@ -6,19 +6,22 @@ import { useArenaStore } from '../store/useArenaStore';
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { userId, username, elo, matchesWon, matchesPlayed, setUserId, setUsername, setElo, setMatchesWon, setMatchesPlayed } = useArenaStore();
+  const { userId, username, elo, matchesWon, matchesPlayed, setUserId, setUsername, setElo, setMatchesWon, setMatchesPlayed, defaultLanguage, setDefaultLanguage, supportedLanguages } = useArenaStore();
   
   const [newUsername, setNewUsername] = useState(username);
+  const [newDefaultLanguage, setNewDefaultLanguage] = useState(defaultLanguage || 'javascript');
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsError, setSettingsError] = useState('');
+  const [settingsSuccess, setSettingsSuccess] = useState('');
   const [isNewUser, setIsNewUser] = useState(location.state?.isNewUser || false);
 
   useEffect(() => {
     setNewUsername(username);
+    setNewDefaultLanguage(defaultLanguage || 'javascript');
     if (isNewUser) {
       window.history.replaceState({}, document.title);
     }
-  }, [username, isNewUser]);
+  }, [username, defaultLanguage, isNewUser]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -31,9 +34,26 @@ const ProfilePage: React.FC = () => {
   };
 
   const handleSaveSettings = async () => {
-    if (!newUsername.trim() || newUsername === username) return;
-    setSettingsLoading(true);
+    if (!newUsername.trim()) return;
+    
     setSettingsError('');
+    setSettingsSuccess('');
+    
+    let languageChanged = false;
+    if (newDefaultLanguage !== defaultLanguage) {
+      setDefaultLanguage(newDefaultLanguage);
+      languageChanged = true;
+    }
+    
+    if (newUsername === username) {
+      if (languageChanged) {
+        setSettingsSuccess('Changes saved successfully!');
+        setTimeout(() => setSettingsSuccess(''), 3000);
+      }
+      return;
+    }
+    
+    setSettingsLoading(true);
     try {
       const token = localStorage.getItem('token');
       const res = await fetch('/api/auth/profile', {
@@ -48,6 +68,8 @@ const ProfilePage: React.FC = () => {
       if (!res.ok) throw new Error(data.error || 'Failed to update profile');
       setUsername(data.username);
       setIsNewUser(false);
+      setSettingsSuccess('Changes saved successfully!');
+      setTimeout(() => setSettingsSuccess(''), 3000);
     } catch (err: any) {
       setSettingsError(err.message);
     } finally {
@@ -108,6 +130,11 @@ const ProfilePage: React.FC = () => {
                   {settingsError}
                 </div>
               )}
+              {settingsSuccess && (
+                <div className="bg-green-500/20 border border-green-500/30 text-green-400 px-4 py-3 rounded-xl text-sm font-medium">
+                  {settingsSuccess}
+                </div>
+              )}
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-widest pl-1">Username</label>
                 <input 
@@ -119,9 +146,26 @@ const ProfilePage: React.FC = () => {
                   disabled={settingsLoading}
                 />
               </div>
+              
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest pl-1">Default Language</label>
+                <select
+                  value={newDefaultLanguage}
+                  onChange={(e) => setNewDefaultLanguage(e.target.value)}
+                  className="w-full bg-black/40 border border-white/10 text-white rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all font-medium appearance-none"
+                  disabled={settingsLoading}
+                >
+                  {supportedLanguages.map(lang => (
+                    <option key={lang.id} value={lang.id} className="bg-[#0B0F19]">
+                      {lang.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <button 
                 onClick={handleSaveSettings}
-                disabled={settingsLoading || !newUsername.trim() || newUsername === username}
+                disabled={settingsLoading || !newUsername.trim() || (newUsername === username && newDefaultLanguage === defaultLanguage)}
                 className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl py-3.5 font-bold transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_25px_rgba(59,130,246,0.5)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-4"
               >
                 {settingsLoading ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
