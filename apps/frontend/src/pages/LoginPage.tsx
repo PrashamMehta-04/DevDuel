@@ -11,7 +11,7 @@ const LoginPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const { setUserId, setUsername, setElo, setMatchesWon, setMatchesPlayed } = useArenaStore();
+  const { setUserId, setUsername, setElo, setMatchesWon, setMatchesPlayed, setIsAdmin } = useArenaStore();
 
   const handleGoogleSuccess = async (credentialResponse: any) => {
     setIsLoading(true);
@@ -33,6 +33,7 @@ const LoginPage: React.FC = () => {
       setElo(data.elo);
       setMatchesWon(data.matchesWon);
       setMatchesPlayed(data.matchesPlayed);
+      setIsAdmin(data.isAdmin || false);
       
       navigate('/dashboard', { state: { isNewUser: data.isNewUser } });
     } catch (err: any) {
@@ -54,7 +55,7 @@ const LoginPage: React.FC = () => {
     
     try {
       const endpoint = isRegistering ? '/api/register' : '/api/login';
-      const res = await fetch(`/api${endpoint}`, {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: username.trim(), password: password.trim() }),
@@ -72,6 +73,7 @@ const LoginPage: React.FC = () => {
       setElo(data.elo);
       setMatchesWon(data.matchesWon);
       setMatchesPlayed(data.matchesPlayed);
+      setIsAdmin(data.isAdmin || false);
       
       navigate('/dashboard');
     } catch (err: any) {

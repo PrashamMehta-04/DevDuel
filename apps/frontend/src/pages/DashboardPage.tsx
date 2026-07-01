@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Swords, Code2, Trophy, Flame, Target, Users, Zap, Clock, Loader2, History, LogOut } from 'lucide-react';
+import { Swords, Code2, Trophy, Flame, Target, Users, Zap, Clock, Loader2, History, LogOut, Shield, Plus } from 'lucide-react';
 import { useArenaStore } from '../store/useArenaStore';
 import { socket } from '../socket';
 import { SOCKET_EVENTS } from '@devduel/shared';
@@ -8,7 +8,7 @@ import { SOCKET_EVENTS } from '@devduel/shared';
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { setGameMode, setMatchId, setMatchEndTime, userId, username, elo, matchesWon, setProblem, setUserId, setUsername, setElo, setMatchesWon, setMatchesPlayed } = useArenaStore();
+  const { setGameMode, setMatchId, setMatchEndTime, userId, username, elo, matchesWon, setProblem, setUserId, setUsername, setElo, setMatchesWon, setMatchesPlayed, isAdmin } = useArenaStore();
   const [isSearching, setIsSearching] = useState(false);
   const [isStartingSolo, setIsStartingSolo] = useState(false);
   const [userStats, setUserStats] = useState({ problemsSolved: 0, globalRank: 'Top 100%', streak: 0 });
@@ -103,6 +103,18 @@ const DashboardPage: React.FC = () => {
             <Trophy size={16} className="text-yellow-400" />
             <span className="text-sm font-bold text-gray-200">Leaderboard</span>
           </Link>
+          {isAdmin && (
+            <>
+              <Link to="/admin" state={{ tab: 'create' }} className="flex items-center gap-2 px-4 py-2 glass-panel rounded-full border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 transition-colors">
+                <Plus size={16} className="text-purple-400" />
+                <span className="text-sm font-bold text-gray-200">Create Problem</span>
+              </Link>
+              <Link to="/admin" state={{ tab: 'list' }} className="flex items-center gap-2 px-4 py-2 glass-panel rounded-full border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 transition-colors">
+                <Shield size={16} className="text-purple-400" />
+                <span className="text-sm font-bold text-gray-200">Manage Problems</span>
+              </Link>
+            </>
+          )}
           <Link to="/history" className="flex items-center gap-2 px-4 py-2 glass-panel rounded-full border border-white/5 hover:bg-white/10 transition-colors">
             <History size={16} className="text-blue-400" />
             <span className="text-sm font-bold text-gray-200">History</span>

@@ -48,6 +48,21 @@ app.use(express.json());
 
 const prisma = new PrismaClient();
 
+async function seedAdmin() {
+  const adminExists = await prisma.user.findUnique({ where: { username: 'admin' } });
+  if (!adminExists) {
+    const hashedPassword = await bcrypt.hash('admin123', 10);
+    await prisma.user.create({
+      data: {
+        username: 'admin',
+        password: hashedPassword,
+        isAdmin: true
+      }
+    });
+    console.log('Seeded admin user (admin / admin123)');
+  }
+}
+
 async function seedProblems() {
   const count = await prisma.problem.count();
   if (count === 0) {
@@ -57,6 +72,7 @@ async function seedProblems() {
           id: 'two-sum',
           title: 'Two Sum',
           description: 'Write a function named `solution(nums, target)` that returns indices of the two numbers such that they add up to target. You may assume that each input would have exactly one solution, and you may not use the same element twice.',
+          constraints: '- 2 <= nums.length <= 10^4\n- -10^9 <= nums[i] <= 10^9\n- -10^9 <= target <= 10^9\n- Only one valid answer exists.',
           testCases: [
             { id: 1, isHidden: false, input: '[[2,7,11,15], 9]', expected: '[0,1]' },
             { id: 2, isHidden: false, input: '[[3,2,4], 6]', expected: '[1,2]' },
@@ -72,6 +88,7 @@ async function seedProblems() {
           id: 'reverse-string',
           title: 'Reverse String',
           description: 'Write a function named `solution(s)` that reverses a string. The input string is given as an array of characters s. You must do this by modifying the input array in-place with O(1) extra memory, and returning the modified array.',
+          constraints: '- 1 <= s.length <= 10^5\n- s[i] is a printable ascii character.',
           testCases: [
             { id: 1, isHidden: false, input: '[["h","e","l","l","o"]]', expected: '["o","l","l","e","h"]' },
             { id: 2, isHidden: true, input: '[["H","a","n","n","a","h"]]', expected: '["h","a","n","n","a","H"]' },
@@ -85,6 +102,7 @@ async function seedProblems() {
           id: 'valid-palindrome',
           title: 'Valid Palindrome',
           description: 'Write a function named `solution(s)` that returns true if a string is a palindrome, and false otherwise. A string is a palindrome when it reads the same forward and backward, ignoring non-alphanumeric characters and case.',
+          constraints: '- 1 <= s.length <= 2 * 10^5\n- s consists only of printable ASCII characters.',
           testCases: [
             { id: 1, isHidden: false, input: '["A man, a plan, a canal: Panama"]', expected: 'true' },
             { id: 2, isHidden: false, input: '["race a car"]', expected: 'false' },
@@ -99,6 +117,7 @@ async function seedProblems() {
           id: 'contains-duplicate',
           title: 'Contains Duplicate',
           description: 'Write a function named `solution(nums)` that returns true if any value appears at least twice in the array, and returns false if every element is distinct.',
+          constraints: '- 1 <= nums.length <= 10^5\n- -10^9 <= nums[i] <= 10^9',
           testCases: [
             { id: 1, isHidden: false, input: '[[1,2,3,1]]', expected: 'true' },
             { id: 2, isHidden: false, input: '[[1,2,3,4]]', expected: 'false' },
@@ -113,6 +132,7 @@ async function seedProblems() {
           id: 'fizz-buzz',
           title: 'Fizz Buzz',
           description: 'Write a function named `solution(n)` that returns an array of strings from 1 to n where: answer[i] == "FizzBuzz" if i is divisible by 3 and 5, answer[i] == "Fizz" if i is divisible by 3, answer[i] == "Buzz" if i is divisible by 5, and answer[i] == i (as a string) if none of the above conditions are true.',
+          constraints: '- 1 <= n <= 10^4',
           testCases: [
             { id: 1, isHidden: false, input: '[3]', expected: '["1","2","Fizz"]' },
             { id: 2, isHidden: false, input: '[5]', expected: '["1","2","Fizz","4","Buzz"]' },
@@ -127,6 +147,7 @@ async function seedProblems() {
           id: 'valid-parentheses',
           title: 'Valid Parentheses',
           description: 'Write a function named `solution(s)` that takes a string containing just the characters "(", ")", "{", "}", "[" and "]", and determines if the input string is valid. Open brackets must be closed by the same type of brackets, in the correct order.',
+          constraints: '- 1 <= s.length <= 10^4\n- s consists of parentheses only \'()[]{}\'.',
           testCases: [
             { id: 1, isHidden: false, input: '["()"]', expected: 'true' },
             { id: 2, isHidden: false, input: '["()[]{}"]', expected: 'true' },
@@ -143,6 +164,7 @@ async function seedProblems() {
           id: 'missing-number',
           title: 'Missing Number',
           description: 'Write a function named `solution(nums)` that takes an array nums containing n distinct numbers in the range [0, n], and returns the only number in the range that is missing from the array.',
+          constraints: '- n == nums.length\n- 1 <= n <= 10^4\n- 0 <= nums[i] <= n\n- All the numbers of nums are unique.',
           testCases: [
             { id: 1, isHidden: false, input: '[[3,0,1]]', expected: '2' },
             { id: 2, isHidden: false, input: '[[0,1]]', expected: '2' },
@@ -159,6 +181,25 @@ async function seedProblems() {
   }
 }
 seedProblems();
+seedAdmin();
+
+const adminAuth = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
+    const token = authHeader.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+    
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
+    const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
+    if (!user || !user.isAdmin) return res.status(403).json({ error: 'Forbidden: Admin access required' });
+    
+    (req as any).user = user;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+};
 
 app.get('/api/problems/random', async (req, res) => {
   try {
@@ -220,18 +261,15 @@ app.get('/api/problems/:problemId/submissions', async (req, res) => {
   }
 });
 
-app.post('/api/problems', async (req, res) => {
+app.post('/api/problems', adminAuth, async (req, res) => {
   try {
-    const { title, description, difficulty, testCases } = req.body;
-    
-    // Basic auth check: In a real app, verify admin role via JWT
-    const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
+    const { title, description, constraints, difficulty, testCases } = req.body;
     
     const problem = await prisma.problem.create({
       data: {
         title,
         description,
+        constraints,
         difficulty: difficulty || 'EASY',
         testCases, // Expects a JSON array
       }
@@ -240,6 +278,51 @@ app.post('/api/problems', async (req, res) => {
     res.json({ success: true, problem });
   } catch (error) {
     console.error('Create problem error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/problems', async (req, res) => {
+  try {
+    const problems = await prisma.problem.findMany({
+      orderBy: { title: 'asc' }
+    });
+    res.json(problems);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.put('/api/problems/:problemId', adminAuth, async (req, res) => {
+  try {
+    const { problemId } = req.params;
+    const { title, description, constraints, difficulty, testCases } = req.body;
+    
+    const problem = await prisma.problem.update({
+      where: { id: problemId },
+      data: {
+        title,
+        description,
+        constraints,
+        difficulty: difficulty || 'EASY',
+        testCases,
+      }
+    });
+    
+    res.json({ success: true, problem });
+  } catch (error) {
+    console.error('Update problem error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.delete('/api/problems/:problemId', adminAuth, async (req, res) => {
+  try {
+    const { problemId } = req.params;
+    await prisma.problem.delete({ where: { id: problemId } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete problem error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -259,7 +342,7 @@ app.post('/api/register', async (req, res) => {
     
     res.json({ 
       id: user.id, username: user.username, elo: user.elo, 
-      matchesWon: 0, matchesPlayed: 0, token 
+      matchesWon: 0, matchesPlayed: 0, token, isAdmin: user.isAdmin
     });
   } catch (error) {
     console.error('Register error:', error);
@@ -288,7 +371,7 @@ app.post('/api/login', async (req, res) => {
     
     res.json({ 
       id: user.id, username: user.username, elo: user.elo, 
-      matchesWon, matchesPlayed, token 
+      matchesWon, matchesPlayed, token, isAdmin: user.isAdmin
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -348,7 +431,7 @@ app.post('/api/auth/google', async (req, res) => {
     
     res.json({ 
       id: user.id, username: user.username, elo: user.elo, 
-      matchesWon, matchesPlayed, token, isNewUser 
+      matchesWon, matchesPlayed, token, isNewUser, isAdmin: user.isAdmin
     });
 
   } catch (error) {
@@ -379,7 +462,7 @@ app.put('/api/auth/profile', async (req, res) => {
       data: { username }
     });
     
-    res.json({ success: true, username: user.username });
+    res.json({ success: true, username: user.username, isAdmin: user.isAdmin });
   } catch (error) {
     console.error('Profile update error:', error);
     res.status(500).json({ error: 'Internal server error' });

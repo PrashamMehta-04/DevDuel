@@ -102,9 +102,20 @@ const MatchPanel: React.FC = () => {
               </div>
             </div>
 
-            <p className="text-gray-300 text-sm leading-relaxed z-10 font-medium">
+            <p className="text-gray-300 text-sm leading-relaxed z-10 font-medium whitespace-pre-wrap">
               {problem.description}
             </p>
+
+            {problem.constraints && (
+              <div className="mt-2 z-10">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                  <Activity size={14} /> Constraints
+                </p>
+                <div className="bg-black/40 backdrop-blur-md p-4 rounded-xl border border-white/5 font-mono text-xs text-gray-300 shadow-inner whitespace-pre-wrap">
+                  {problem.constraints}
+                </div>
+              </div>
+            )}
 
             <div className="mt-2 z-10">
               <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2">

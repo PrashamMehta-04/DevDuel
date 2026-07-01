@@ -67,58 +67,72 @@ for (const inp of inputs) {
   },
 };
 
-const PROBLEM_TYPES: Record<string, { args: string[], ret: string }> = {
-  'two-sum': { args: ['vector<int>', 'int'], ret: 'vector<int>' },
-  'reverse-string': { args: ['vector<string>'], ret: 'vector<string>' },
-  'valid-palindrome': { args: ['string'], ret: 'bool' },
-  'contains-duplicate': { args: ['vector<int>'], ret: 'bool' },
-  'fizz-buzz': { args: ['int'], ret: 'vector<string>' },
-  'valid-parentheses': { args: ['string'], ret: 'bool' },
-  'missing-number': { args: ['vector<int>'], ret: 'int' },
-};
+function inferType(val: any): string {
+  if (typeof val === 'number') return 'int';
+  if (typeof val === 'boolean') return 'bool';
+  if (typeof val === 'string') return 'string';
+  if (Array.isArray(val)) {
+    if (val.length === 0) return 'vector<int>'; // Default fallback for empty arrays
+    const innerType = inferType(val[0]);
+    return `vector<${innerType}>`;
+  }
+  return 'string';
+}
+
+function inferSignature(testCases: any[]): { args: string[], ret: string } {
+  if (!testCases || testCases.length === 0) return { args: ['vector<int>', 'int'], ret: 'vector<int>' };
+  try {
+    const firstInput = JSON.parse(testCases[0].input);
+    const firstExpected = JSON.parse(testCases[0].expected);
+    const args = Array.isArray(firstInput) ? firstInput.map((arg: any) => inferType(arg)) : [inferType(firstInput)];
+    const ret = inferType(firstExpected);
+    return { args, ret };
+  } catch (e) {
+    return { args: ['vector<int>', 'int'], ret: 'vector<int>' }; // fallback
+  }
+}
 
 function toCppVal(val: any, type: string): string {
   if (type === 'int') return val.toString();
   if (type === 'bool') return val ? 'true' : 'false';
   if (type === 'string') return `"${val}"`;
-  if (type === 'vector<int>') return `std::vector<int>{${val.join(',')}}`;
-  if (type === 'vector<string>') return `std::vector<std::string>{${val.map((v: string) => `"${v}"`).join(',')}}`;
+  if (type.startsWith('vector<')) {
+    const innerType = type.slice(7, -1);
+    const innerTypeCpp = innerType.replace(/vector/g, 'std::vector').replace(/string/g, 'std::string');
+    return `std::vector<${innerTypeCpp}>{${val.map((v: any) => toCppVal(v, innerType)).join(',')}}`;
+  }
   return '';
 }
 
 function cppPrint(varName: string, type: string): string {
-  if (type === 'int') return `std::cout << "@@RESULT@@" << ${varName} << std::endl;`;
-  if (type === 'bool') return `std::cout << "@@RESULT@@" << (${varName} ? "true" : "false") << std::endl;`;
-  if (type === 'string') return `std::cout << "@@RESULT@@\\"" << ${varName} << "\\"" << std::endl;`;
-  if (type === 'vector<int>') return `std::cout << "@@RESULT@@["; for(int j=0; j<${varName}.size(); j++) { std::cout << ${varName}[j]; if(j<${varName}.size()-1) std::cout << ","; } std::cout << "]" << std::endl;`;
-  if (type === 'vector<string>') return `std::cout << "@@RESULT@@["; for(int j=0; j<${varName}.size(); j++) { std::cout << "\\"" << ${varName}[j] << "\\""; if(j<${varName}.size()-1) std::cout << ","; } std::cout << "]" << std::endl;`;
-  return '';
+  return `std::cout << "@@RESULT@@" << to_json(${varName}) << std::endl;`;
+}
+
+function javaType(type: string): string {
+  if (type === 'int') return 'int';
+  if (type === 'bool') return 'boolean';
+  if (type === 'string') return 'String';
+  if (type.startsWith('vector<')) {
+    const innerType = type.slice(7, -1);
+    return javaType(innerType) + '[]';
+  }
+  return type;
 }
 
 function toJavaVal(val: any, type: string): string {
   if (type === 'int') return val.toString();
   if (type === 'bool') return val ? 'true' : 'false';
   if (type === 'string') return `"${val}"`;
-  if (type === 'vector<int>') return `new int[]{${val.join(',')}}`;
-  if (type === 'vector<string>') return `new String[]{${val.map((v: string) => `"${v}"`).join(',')}}`;
+  if (type.startsWith('vector<')) {
+    const innerType = type.slice(7, -1);
+    const jType = javaType(type);
+    return `new ${jType}{${val.map((v: any) => toJavaVal(v, innerType)).join(',')}}`;
+  }
   return '';
-}
-
-function javaType(type: string): string {
-  if (type === 'vector<int>') return 'int[]';
-  if (type === 'vector<string>') return 'String[]';
-  if (type === 'string') return 'String';
-  if (type === 'bool') return 'boolean';
-  return type;
 }
 
 function javaPrint(varName: string, type: string): string {
-  if (type === 'int') return `System.out.println("@@RESULT@@" + ${varName});`;
-  if (type === 'bool') return `System.out.println("@@RESULT@@" + ${varName});`;
-  if (type === 'string') return `System.out.println("@@RESULT@@\\"" + ${varName} + "\\"");`;
-  if (type === 'vector<int>') return `System.out.print("@@RESULT@@["); for(int j=0; j<${varName}.length; j++) { System.out.print(${varName}[j]); if(j<${varName}.length-1) System.out.print(","); } System.out.println("]");`;
-  if (type === 'vector<string>') return `System.out.print("@@RESULT@@["); for(int j=0; j<${varName}.length; j++) { System.out.print("\\"" + ${varName}[j] + "\\""); if(j<${varName}.length-1) System.out.print(","); } System.out.println("]");`;
-  return '';
+  return `System.out.println("@@RESULT@@" + toJson(${varName}));`;
 }
 
 const worker = new Worker(
@@ -143,14 +157,20 @@ const worker = new Worker(
       const inputs = activeTests.map(t => t.input);
       let wrapperCode = code;
       let mainCode = '';
-      const sig = PROBLEM_TYPES[problemId || 'two-sum'];
+      const sig = inferSignature(activeTests);
       
       if (language === 'python') {
          wrapperCode = `import json\nimport sys\n${code}\n\ninputs = json.loads('''${JSON.stringify(inputs)}''')\nfor inp in inputs:\n    try:\n        args = json.loads(inp)\n        result = solution(*args)\n        print("@@RESULT@@" + json.dumps(result, separators=(',', ':')))\n    except Exception as e:\n        print("@@RESULT@@Error:", str(e))`;
       } else if (language === 'javascript') {
          wrapperCode = `${code}\n\nconst inputs = JSON.parse(\`${JSON.stringify(inputs).replace(/\\/g, '\\\\').replace(/`/g, '\\`')}\`);\nfor (const inp of inputs) {\n    try {\n        const args = JSON.parse(inp);\n        const result = solution(...args);\n        console.log("@@RESULT@@" + JSON.stringify(result));\n    } catch (e) {\n        console.log("@@RESULT@@Error:", e.message);\n    }\n}`;
       } else if (language === 'cpp') {
-         let mainBody = '\n#include <iostream>\n#include <vector>\n#include <string>\nint main() {\n';
+         let mainBody = '\n#include <iostream>\n#include <vector>\n#include <string>\n';
+         mainBody += 'std::string to_json(int v) { return std::to_string(v); }\n';
+         mainBody += 'std::string to_json(bool v) { return v ? "true" : "false"; }\n';
+         mainBody += 'std::string to_json(const std::string& v) { return "\\"" + v + "\\""; }\n';
+         mainBody += 'template<typename T> std::string to_json(const std::vector<T>& v) {\n';
+         mainBody += '  std::string res = "[";\n  for(size_t i=0; i<v.size(); i++) { res += to_json(v[i]); if(i<v.size()-1) res += ","; }\n  return res + "]";\n}\n';
+         mainBody += 'int main() {\n';
          for (let i = 0; i < inputs.length; i++) {
            const args = JSON.parse(inputs[i]);
            mainBody += `    try {\n`;
@@ -165,7 +185,14 @@ const worker = new Worker(
          mainBody += '    return 0;\n}\n';
          wrapperCode = code + mainBody;
       } else if (language === 'java') {
-         mainCode = `class Main {\n    public static void main(String[] args) {\n        Solution sol = new Solution();\n`;
+         mainCode = `class Main {\n`;
+         mainCode += `    static String toJson(int v) { return String.valueOf(v); }\n`;
+         mainCode += `    static String toJson(boolean v) { return v ? "true" : "false"; }\n`;
+         mainCode += `    static String toJson(String v) { return "\\"" + v + "\\""; }\n`;
+         mainCode += `    static String toJson(int[] v) { StringBuilder sb = new StringBuilder("["); for(int i=0; i<v.length; i++) { sb.append(toJson(v[i])); if(i<v.length-1) sb.append(","); } return sb.append("]").toString(); }\n`;
+         mainCode += `    static String toJson(String[] v) { StringBuilder sb = new StringBuilder("["); for(int i=0; i<v.length; i++) { sb.append(toJson(v[i])); if(i<v.length-1) sb.append(","); } return sb.append("]").toString(); }\n`;
+         mainCode += `    static String toJson(Object[] v) { StringBuilder sb = new StringBuilder("["); for(int i=0; i<v.length; i++) { if(v[i] instanceof int[]) sb.append(toJson((int[])v[i])); else if(v[i] instanceof String[]) sb.append(toJson((String[])v[i])); else if(v[i] instanceof Object[]) sb.append(toJson((Object[])v[i])); if(i<v.length-1) sb.append(","); } return sb.append("]").toString(); }\n`;
+         mainCode += `    public static void main(String[] args) {\n        Solution sol = new Solution();\n`;
          for (let i = 0; i < inputs.length; i++) {
            const args = JSON.parse(inputs[i]);
            const javaArgs = args.map((a: any, idx: number) => toJavaVal(a, sig.args[idx])).join(', ');

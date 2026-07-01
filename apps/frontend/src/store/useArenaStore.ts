@@ -8,6 +8,7 @@ interface ArenaState {
   elo: number;
   matchesWon: number;
   matchesPlayed: number;
+  isAdmin: boolean;
   code: string;
   language: string;
   supportedLanguages: { id: string; name: string; defaultCode: string }[];
@@ -15,6 +16,7 @@ interface ArenaState {
     id?: string;
     title: string;
     description: string;
+    constraints?: string;
     defaultCode?: Record<string, string>;
   };
   opponentProgress: number;
@@ -27,13 +29,14 @@ interface ArenaState {
   setElo: (elo: number) => void;
   setMatchesWon: (won: number) => void;
   setMatchesPlayed: (played: number) => void;
+  setIsAdmin: (isAdmin: boolean) => void;
   setCode: (code: string) => void;
   setLanguage: (lang: string) => void;
   setOpponentProgress: (progress: number) => void;
   setIsOpponentTyping: (isTyping: boolean) => void;
   setIsConnected: (connected: boolean) => void;
   setMatchEndTime: (time: number | null) => void;
-  setProblem: (problem: { title: string; description: string; defaultCode?: Record<string, string> }) => void;
+  setProblem: (problem: { title: string; description: string; constraints?: string; defaultCode?: Record<string, string> }) => void;
   defaultLanguage: string;
   setDefaultLanguage: (lang: string) => void;
   testResult: any | null;
@@ -63,6 +66,7 @@ export const useArenaStore = create<ArenaState>()(
       elo: 1200,
       matchesWon: 0,
       matchesPlayed: 0,
+      isAdmin: false,
       code: 'def solution(nums, target):\n    # Write your code here\n    pass',
       language: 'python',
       defaultLanguage: 'javascript',
@@ -92,6 +96,7 @@ export const useArenaStore = create<ArenaState>()(
       setElo: (elo) => set({ elo }),
       setMatchesWon: (matchesWon) => set({ matchesWon }),
       setMatchesPlayed: (matchesPlayed) => set({ matchesPlayed }),
+      setIsAdmin: (isAdmin) => set({ isAdmin }),
       setCode: (code) => set({ code }),
       setLanguage: (lang) => {
         const problem = get().problem;
@@ -127,6 +132,7 @@ export const useArenaStore = create<ArenaState>()(
         matchEndTime: state.matchEndTime,
         problem: state.problem,
         defaultLanguage: state.defaultLanguage,
+        isAdmin: state.isAdmin,
       }),
     }
   )

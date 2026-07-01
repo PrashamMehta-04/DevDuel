@@ -13,6 +13,7 @@ model User {
   password String?
   googleId String? @unique
   elo      Int    @default(1200)
+  isAdmin  Boolean @default(false)
   matches  Match[]
   submissions Submission[]
 }
@@ -30,6 +31,7 @@ model Problem {
   id          String   @id @default(uuid())
   title       String
   description String
+  constraints String?
   difficulty  String   @default("EASY")
   testCases   Json
   defaultCode Json?
