@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Swords, Plus, Trash2, ArrowRight } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Swords, Plus, Trash2, ArrowLeft, ArrowRight } from 'lucide-react';
 
 interface TestCase {
   id: number;
@@ -18,6 +18,7 @@ const AdminPage: React.FC = () => {
     { id: 1, inputs: [''], expected: '', isHidden: false }
   ]);
   const location = useLocation();
+  const navigate = useNavigate();
   const initialTab = location.state?.tab === 'list' ? 'list' : 'create';
   const [activeTab, setActiveTab] = useState<'create' | 'list'>(initialTab);
   const [problemsList, setProblemsList] = useState<any[]>([]);
@@ -172,13 +173,28 @@ const AdminPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#0B0F19] text-white p-8">
-      <header className="flex items-center justify-between mb-8">
-        <Link to="/dashboard" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+      <header className="flex items-center justify-between mb-8 max-w-4xl mx-auto">
+        <button 
+          onClick={() => {
+            if (editingProblemId) {
+              setEditingProblemId(null);
+              setActiveTab('list');
+              resetForm();
+            } else {
+              navigate(-1);
+            }
+          }} 
+          className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors glass-panel px-4 py-2 rounded-xl border border-white/5 bg-black/20"
+        >
+          <ArrowLeft size={18} /> Back
+        </button>
+        <div className="flex items-center gap-3">
           <div className="p-2 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-lg border border-white/10">
             <Swords size={20} className="text-blue-400" />
           </div>
           <h1 className="text-2xl font-black tracking-tight">DEV<span className="text-gradient">DUEL</span> Admin</h1>
-        </Link>
+        </div>
+        <div className="w-40"></div>
       </header>
       
       <main className="max-w-4xl mx-auto glass-panel p-8 rounded-3xl border border-white/10">

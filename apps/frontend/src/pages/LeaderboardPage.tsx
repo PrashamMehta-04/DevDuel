@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Swords, Trophy, ArrowLeft } from 'lucide-react';
 import { useArenaStore } from '../store/useArenaStore';
+import { RankBadge } from '../components/RankBadge';
 
 interface LeaderboardUser {
   id: string;
@@ -10,6 +11,7 @@ interface LeaderboardUser {
 }
 
 const LeaderboardPage: React.FC = () => {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
   const [loading, setLoading] = useState(true);
   const currentUserId = useArenaStore((state) => state.userId);
@@ -36,9 +38,9 @@ const LeaderboardPage: React.FC = () => {
       </div>
 
       <header className="relative z-10 flex items-center justify-between mb-12 max-w-4xl mx-auto w-full">
-        <Link to="/dashboard" className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors glass-panel px-4 py-2 rounded-xl">
-          <ArrowLeft size={18} /> Back to Dashboard
-        </Link>
+        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors glass-panel px-4 py-2 rounded-xl">
+          <ArrowLeft size={18} /> Back
+        </button>
         <div className="flex items-center gap-3">
           <div className="p-2 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-lg border border-white/10 shadow-[0_0_15px_rgba(234,179,8,0.3)]">
             <Trophy size={24} className="text-yellow-400" />
@@ -92,8 +94,9 @@ const LeaderboardPage: React.FC = () => {
                         {user.username} {isCurrentUser && '(You)'}
                       </span>
                     </div>
-                    <div className="col-span-4 text-right">
+                    <div className="col-span-4 text-right flex items-center justify-end gap-3">
                       <span className="text-2xl font-black text-white tracking-tight">{user.elo}</span>
+                      <RankBadge elo={user.elo} size="sm" />
                     </div>
                   </div>
                 );

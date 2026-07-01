@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useArenaStore } from '../store/useArenaStore';
 import { Trophy, Clock, Terminal, Play, Send, BrainCircuit, Activity, Loader2, History, CheckCircle, XCircle, Copy } from 'lucide-react';
+import { RankBadge } from './RankBadge';
 import { socket } from '../socket';
 import { SOCKET_EVENTS } from '@devduel/shared';
 
@@ -8,6 +9,8 @@ const MatchPanel: React.FC = () => {
   const { 
     problem, 
     opponentProgress, 
+    opponentUsername,
+    opponentElo,
     isOpponentTyping, 
     code, 
     language, 
@@ -201,7 +204,12 @@ const MatchPanel: React.FC = () => {
           <div className="space-y-6 z-10">
             <div className="space-y-3">
               <div className="flex justify-between items-end">
-                <span className="text-sm font-semibold text-gray-300">Opponent <span className="text-gray-500 font-normal">(ProCoder123)</span></span>
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm font-semibold text-gray-300 flex items-center gap-2">
+                    Opponent <span className="text-gray-500 font-normal">({opponentUsername || 'ProCoder123'})</span>
+                  </span>
+                  {opponentElo && <RankBadge elo={opponentElo} size="sm" />}
+                </div>
                 <span className="text-lg font-black text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]">{opponentProgress}%</span>
               </div>
               <div className="w-full bg-black/50 rounded-full h-3 p-0.5 border border-white/5 shadow-inner">

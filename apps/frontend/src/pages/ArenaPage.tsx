@@ -4,12 +4,14 @@ import MatchPanel from '../components/MatchPanel';
 import { socket } from '../socket';
 import { useArenaStore } from '../store/useArenaStore';
 import { SOCKET_EVENTS } from '@devduel/shared';
-import { Swords, Activity, Trophy, XCircle, ArrowRight, Clock } from 'lucide-react';
+import { Swords, Activity, Trophy, XCircle, ArrowRight, Clock, ArrowLeft } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 const ArenaPage: React.FC = () => {
   const navigate = useNavigate();
   const [timeLeft, setTimeLeft] = useState<string>('30:00');
+  const [receivedEmote, setReceivedEmote] = useState<{ emoji: string, id: number } | null>(null);
+  const [sentEmote, setSentEmote] = useState<{ emoji: string, id: number } | null>(null);
   const { isConnected, setIsConnected, setIsOpponentTyping, setOpponentProgress, matchId, gameMode, matchOverResult, setMatchOverResult, userId, matchEndTime } = useArenaStore();
 
   useEffect(() => {
@@ -66,12 +68,18 @@ const ArenaPage: React.FC = () => {
       useArenaStore.getState().setMatchOverResult(payload);
     }
 
+    function onReceiveEmote(payload: { emote: string }) {
+      setReceivedEmote({ emoji: payload.emote, id: Date.now() });
+      setTimeout(() => setReceivedEmote(null), 3000);
+    }
+
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on(SOCKET_EVENTS.OPPONENT_TYPING, onOpponentTyping);
     socket.on(SOCKET_EVENTS.OPPONENT_PROGRESS, onOpponentProgress);
     socket.on(SOCKET_EVENTS.TEST_RESULT, onTestResult);
     socket.on(SOCKET_EVENTS.MATCH_OVER, onMatchOver);
+    socket.on(SOCKET_EVENTS.RECEIVE_EMOTE, onReceiveEmote);
 
     // CRITICAL FIX: If socket is already connected when this component mounts, we must trigger onConnect manually
     if (socket.connected) {
@@ -85,8 +93,17 @@ const ArenaPage: React.FC = () => {
       socket.off(SOCKET_EVENTS.OPPONENT_PROGRESS, onOpponentProgress);
       socket.off(SOCKET_EVENTS.TEST_RESULT, onTestResult);
       socket.off(SOCKET_EVENTS.MATCH_OVER, onMatchOver);
+      socket.off(SOCKET_EVENTS.RECEIVE_EMOTE, onReceiveEmote);
     };
   }, [matchId, setIsConnected, setIsOpponentTyping, setOpponentProgress]);
+
+  const EMOTES = ['🚀', '🔥', '💀', '👀', '😅'];
+
+  const handleSendEmote = (emote: string) => {
+    socket.emit(SOCKET_EVENTS.SEND_EMOTE, { matchId, emote });
+    setSentEmote({ emoji: emote, id: Date.now() });
+    setTimeout(() => setSentEmote(null), 3000);
+  };
 
   return (
     <div className="h-screen w-screen relative overflow-hidden bg-[#0B0F19]">
@@ -98,21 +115,54 @@ const ArenaPage: React.FC = () => {
       </div>
 
       <div className="relative z-10 flex flex-col h-full">
-        {/* Header */}
-        <header className="h-16 glass-panel border-b-0 border-white/5 flex items-center justify-between px-8 flex-shrink-0 mb-4 mx-4 mt-4 rounded-2xl">
-          <Link to="/dashboard" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <div className="p-2 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-lg border border-white/10 shadow-[0_0_15px_rgba(59,130,246,0.3)]">
-              <Swords size={20} className="text-blue-400" />
+        {/* Floating Emotes Layer */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden z-50">
+          {receivedEmote && (
+            <div key={`rx-${receivedEmote.id}`} className="absolute top-[30%] left-[60%] text-7xl animate-bounce drop-shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all">
+              {receivedEmote.emoji}
             </div>
-            <h1 className="text-2xl font-black tracking-tight text-white">DEV<span className="text-gradient">DUEL</span></h1>
-          </Link>
+          )}
+          {sentEmote && (
+            <div key={`tx-${sentEmote.id}`} className="absolute top-[80%] left-[30%] text-5xl animate-bounce drop-shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all">
+              {sentEmote.emoji}
+            </div>
+          )}
+        </div>
+
+        {/* Header */}
+        <header className="h-16 glass-panel border-b-0 border-white/5 flex items-center justify-between px-8 flex-shrink-0 mb-4 mx-4 mt-4 rounded-2xl relative z-40">
+          <div className="flex items-center gap-4">
+            <button onClick={() => { if(window.confirm(gameMode === 'solo' ? 'Are you sure you want to leave Practice Mode?' : 'Are you sure you want to leave? If you are in a battle, you might lose Elo!')) navigate(-1); }} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
+              <ArrowLeft size={16} />
+              <span className="text-sm font-bold">Back</span>
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-lg border border-white/10 shadow-[0_0_15px_rgba(59,130,246,0.3)]">
+                <Swords size={20} className="text-blue-400" />
+              </div>
+              <h1 className="text-2xl font-black tracking-tight text-white">DEV<span className="text-gradient">DUEL</span></h1>
+            </div>
+          </div>
           <div className="flex items-center gap-4">
             {gameMode === 'battle' && (
               <>
+                <div className="flex items-center gap-2 px-3 py-1.5 glass-panel rounded-full border border-white/10 shadow-inner bg-black/20">
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-widest mr-1">React:</span>
+                  {EMOTES.map(emote => (
+                    <button 
+                      key={emote}
+                      onClick={() => handleSendEmote(emote)}
+                      className="hover:scale-125 hover:-translate-y-1 transition-all text-sm"
+                      title="Send Emote"
+                    >
+                      {emote}
+                    </button>
+                  ))}
+                </div>
                 <div className="flex items-center gap-2 px-4 py-1.5 glass-panel rounded-full border border-white/10 shadow-inner bg-black/20">
-                  <Clock size={14} className="text-blue-400" />
-                  <span className="text-sm font-bold tracking-wider text-white font-mono">
-                    {timeLeft}
+                  <Clock size={14} className="text-gray-400" />
+                  <span className="text-sm font-bold tracking-widest font-mono text-gray-200">
+                    {gameMode === 'solo' ? 'ZEN MODE' : timeLeft}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 px-4 py-1.5 glass-panel rounded-full border border-white/10 shadow-inner">
@@ -146,12 +196,16 @@ const ArenaPage: React.FC = () => {
                 <div className="w-20 h-20 bg-yellow-500/20 rounded-full flex items-center justify-center mb-4 shadow-[0_0_30px_rgba(234,179,8,0.4)]">
                   <Trophy size={40} className="text-yellow-400" />
                 </div>
-                <h2 className="text-4xl font-black text-white tracking-tight mb-2">VICTORY!</h2>
+                <h2 className="text-4xl font-black text-white tracking-tight mb-2">
+                  {gameMode === 'solo' ? 'PRACTICE COMPLETE!' : 'VICTORY!'}
+                </h2>
                 <p className="text-gray-300 mb-6 font-medium">{matchOverResult.reason}</p>
-                <div className="bg-black/40 rounded-xl p-4 w-full flex justify-between items-center mb-8 border border-white/5">
-                  <span className="text-gray-400 font-bold">Elo Rating</span>
-                  <span className="text-2xl font-black text-green-400">+{matchOverResult.winnerEloChange}</span>
-                </div>
+                {gameMode !== 'solo' && (
+                  <div className="bg-black/40 rounded-xl p-4 w-full flex justify-between items-center mb-8 border border-white/5">
+                    <span className="text-gray-400 font-bold">Elo Rating</span>
+                    <span className="text-2xl font-black text-green-400">+{matchOverResult.winnerEloChange}</span>
+                  </div>
+                )}
               </>
             ) : matchOverResult.winnerId === null ? (
               <>

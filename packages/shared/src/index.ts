@@ -26,6 +26,13 @@ export const SOCKET_EVENTS = {
   TEST_RESULT: 'test_result',
   OPPONENT_TYPING: 'opponent_typing',
   OPPONENT_PROGRESS: 'opponent_progress',
+  CREATE_PRIVATE_MATCH: 'match:create_private',
+  PRIVATE_MATCH_CREATED: 'match:private_created',
+  JOIN_PRIVATE_MATCH: 'match:join_private',
+  JOIN_PRIVATE_MATCH_ERROR: 'match:join_private_error',
+  SEND_EMOTE: 'match:send_emote',
+  RECEIVE_EMOTE: 'match:receive_emote',
+  START_PRACTICE: 'match:start_practice',
 } as const;
 
 export interface CodeUpdatePayload {
@@ -74,6 +81,8 @@ export interface SubmissionResultPayload {
 export interface MatchStartPayload {
   matchId: string;
   opponentId: string;
+  opponentUsername?: string;
+  opponentRating?: number;
   startTime: number;
   endTime: number;
   problem?: {

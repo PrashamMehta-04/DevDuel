@@ -1,16 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Swords, Code2, Trophy, Flame, Target, Users, Zap, Clock, Loader2, History, LogOut, Shield, Plus } from 'lucide-react';
+import { Swords, Code2, Trophy, Flame, Target, Users, Zap, Clock, Loader2, History, LogOut, Shield, Plus, Check, Copy, BrainCircuit } from 'lucide-react';
 import { useArenaStore } from '../store/useArenaStore';
+import { RankBadge } from '../components/RankBadge';
 import { socket } from '../socket';
 import { SOCKET_EVENTS } from '@devduel/shared';
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { setGameMode, setMatchId, setMatchEndTime, userId, username, elo, matchesWon, setProblem, setUserId, setUsername, setElo, setMatchesWon, setMatchesPlayed, isAdmin } = useArenaStore();
+  const { setGameMode, setMatchId, setMatchEndTime, userId, username, elo, matchesWon, setProblem, setUserId, setUsername, setElo, setMatchesWon, setMatchesPlayed, isAdmin, setOpponentUsername, setOpponentElo } = useArenaStore();
+  
   const [isSearching, setIsSearching] = useState(false);
   const [isStartingSolo, setIsStartingSolo] = useState(false);
+  const [isCreatingPrivate, setIsCreatingPrivate] = useState(false);
+  const [isJoiningPrivate, setIsJoiningPrivate] = useState(false);
+  const [privateRoomCode, setPrivateRoomCode] = useState<string | null>(null);
+  const [joinCode, setJoinCode] = useState('');
+  const [copiedCode, setCopiedCode] = useState(false);
+  
   const [userStats, setUserStats] = useState({ problemsSolved: 0, globalRank: 'Top 100%', streak: 0 });
   const [globalStats, setGlobalStats] = useState({ solvedToday: 0 });
   const [dailyProblem, setDailyProblem] = useState<{id: string, title: string, description: string} | null>(null);
@@ -57,29 +65,61 @@ const DashboardPage: React.FC = () => {
     navigate('/login');
   };
 
-
-
   useEffect(() => {
-    const onMatchFound = (payload: { matchId: string, opponentId: string, endTime: number, problem?: { title: string; description: string } }) => {
+    const onMatchFound = (payload: { matchId: string, opponentId: string, opponentUsername?: string, opponentRating?: number, endTime: number, problem?: { title: string; description: string } }) => {
       setIsSearching(false);
+      setIsJoiningPrivate(false);
       setMatchId(payload.matchId);
       setMatchEndTime(payload.endTime);
+      if (payload.opponentUsername) setOpponentUsername(payload.opponentUsername);
+      if (payload.opponentRating) setOpponentElo(payload.opponentRating);
       if (payload.problem) {
         setProblem(payload.problem);
       }
-      setGameMode('battle');
+      setGameMode(payload.matchId.startsWith('solo') ? 'solo' : 'battle');
       navigate('/arena');
     };
 
+    const onPrivateMatchCreated = (payload: { roomCode: string }) => {
+      setIsCreatingPrivate(false);
+      setPrivateRoomCode(payload.roomCode);
+    };
+
+    const onJoinPrivateError = (payload: { error: string }) => {
+      setIsJoiningPrivate(false);
+      alert(payload.error);
+    };
+
     socket.on(SOCKET_EVENTS.MATCH_FOUND, onMatchFound);
+    socket.on(SOCKET_EVENTS.PRIVATE_MATCH_CREATED, onPrivateMatchCreated);
+    socket.on(SOCKET_EVENTS.JOIN_PRIVATE_MATCH_ERROR, onJoinPrivateError);
     return () => {
       socket.off(SOCKET_EVENTS.MATCH_FOUND, onMatchFound);
+      socket.off(SOCKET_EVENTS.PRIVATE_MATCH_CREATED, onPrivateMatchCreated);
+      socket.off(SOCKET_EVENTS.JOIN_PRIVATE_MATCH_ERROR, onJoinPrivateError);
     };
-  }, [navigate, setGameMode, setMatchId]);
+  }, [navigate, setGameMode, setMatchId, setOpponentUsername, setOpponentElo, setProblem, setMatchEndTime]);
 
   const handleFindMatch = () => {
     setIsSearching(true);
-    socket.emit(SOCKET_EVENTS.FIND_MATCH, { userId, rating: elo });
+    socket.emit(SOCKET_EVENTS.FIND_MATCH, { userId, username, rating: elo });
+  };
+
+  const handleCreatePrivateMatch = () => {
+    setIsCreatingPrivate(true);
+    socket.emit(SOCKET_EVENTS.CREATE_PRIVATE_MATCH, { userId, username, rating: elo });
+  };
+
+  const handleJoinPrivateMatch = () => {
+    if (!joinCode.trim()) return;
+    setIsJoiningPrivate(true);
+    socket.emit(SOCKET_EVENTS.JOIN_PRIVATE_MATCH, { userId, username, rating: elo, roomCode: joinCode.trim() });
+  };
+
+  const handleStartPractice = () => {
+    setIsStartingSolo(true);
+    socket.emit(SOCKET_EVENTS.START_PRACTICE, { userId, username });
+    // It will trigger MATCH_FOUND quickly
   };
 
   return (
@@ -142,63 +182,80 @@ const DashboardPage: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Problem of the Day */}
-          <div className="lg:col-span-2 glass-panel rounded-3xl p-8 border border-white/10 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-[80px] -mr-20 -mt-20 transition-all duration-700 group-hover:bg-blue-500/20 pointer-events-none"></div>
+          
+          {/* Private Duel Card */}
+          <div className="glass-panel p-8 rounded-3xl border border-purple-500/30 flex flex-col items-center text-center relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/20 blur-[50px] rounded-full group-hover:bg-purple-500/40 transition-colors pointer-events-none"></div>
             
-            <div className="relative z-10 flex flex-col h-full justify-between gap-6">
-              <div>
-                <div className="flex items-center gap-2 mb-5">
-                  <div className="px-3 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-bold rounded-full border border-yellow-500/30 flex items-center gap-1.5 shadow-[0_0_10px_rgba(234,179,8,0.2)]">
-                    <Target size={12} /> Problem of the Day
+            <div className="w-16 h-16 bg-purple-500/20 rounded-2xl flex items-center justify-center mb-6 border border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.4)]">
+              <Users size={32} className="text-purple-400" />
+            </div>
+            
+            <h2 className="text-2xl font-black text-white mb-2 tracking-tight">Private Duel</h2>
+            <p className="text-gray-400 font-medium mb-8 text-sm">Challenge a friend to a 1v1 battle.</p>
+            
+            <div className="w-full space-y-4">
+              {privateRoomCode ? (
+                <div className="bg-black/40 rounded-xl p-4 border border-purple-500/30">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-widest block mb-1">Room Code</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-2xl font-black tracking-widest text-white">{privateRoomCode}</span>
+                    <button 
+                      onClick={() => {
+                        navigator.clipboard.writeText(privateRoomCode);
+                        setCopiedCode(true);
+                        setTimeout(() => setCopiedCode(false), 2000);
+                      }}
+                      className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-white"
+                    >
+                      {copiedCode ? <Check size={18} className="text-green-400" /> : <Copy size={18} />}
+                    </button>
                   </div>
                 </div>
-                <h3 className="text-3xl font-bold mb-3 text-glow">{dailyProblem ? dailyProblem.title : 'Loading...'}</h3>
-                <p className="text-gray-400 leading-relaxed max-w-xl text-sm font-medium line-clamp-3">
-                  {dailyProblem ? dailyProblem.description : ''}
-                </p>
-              </div>
-              
-              <div className="flex items-center gap-4 mt-4">
+              ) : (
                 <button 
-                  disabled={isStartingSolo}
-                  onClick={async () => {
-                    setIsStartingSolo(true);
-                    try {
-                      const res = await fetch('/api/problems/two-sum');
-                      if (res.ok) {
-                        const problem = await res.json();
-                        setProblem(problem);
-                        if (problem.id) {
-                          setMatchId(problem.id);
-                        }
-                      }
-                    } catch (e) {
-                      console.error("Failed to fetch random problem", e);
-                    }
-                    setGameMode('solo');
-                    navigate('/arena');
-                  }}
-                  className="bg-white hover:bg-gray-100 text-black px-6 py-3 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.4)] hover:-translate-y-0.5 flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                  onClick={handleCreatePrivateMatch}
+                  disabled={isCreatingPrivate}
+                  className="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:shadow-[0_0_30px_rgba(168,85,247,0.5)] flex items-center justify-center gap-2"
                 >
-                  {isStartingSolo ? <Loader2 size={18} className="animate-spin" /> : <Code2 size={18} />}
-                  {isStartingSolo ? 'Loading...' : 'Solve Solo'}
+                  {isCreatingPrivate ? <Loader2 className="animate-spin" size={20} /> : <><Users size={20} /> Create Room</>}
                 </button>
-                <div className="flex items-center gap-2 text-sm text-gray-400 font-medium ml-2">
-                  <Users size={16} /> <span className="text-gray-300 font-bold">{globalStats.solvedToday.toLocaleString()}</span> solved today
-                </div>
+              )}
+
+              <div className="relative flex items-center py-2">
+                <div className="flex-grow border-t border-white/10"></div>
+                <span className="flex-shrink-0 mx-4 text-xs font-bold text-gray-500 uppercase tracking-widest">OR</span>
+                <div className="flex-grow border-t border-white/10"></div>
+              </div>
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Enter Code"
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                  maxLength={6}
+                  className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white font-bold tracking-widest text-center focus:outline-none focus:border-purple-500/50 uppercase"
+                />
+                <button 
+                  onClick={handleJoinPrivateMatch}
+                  disabled={isJoiningPrivate || joinCode.length < 1}
+                  className="bg-white/10 hover:bg-white/20 text-white font-bold px-6 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center"
+                >
+                  {isJoiningPrivate ? <Loader2 className="animate-spin" size={20} /> : 'Join'}
+                </button>
               </div>
             </div>
           </div>
 
           {/* Multiplayer Battle */}
           <div className="glass-panel rounded-3xl p-8 border border-white/10 relative overflow-hidden group">
-            <div className="absolute bottom-0 right-0 w-48 h-48 bg-purple-500/10 rounded-full blur-[60px] -mr-10 -mb-10 transition-all duration-700 group-hover:bg-purple-500/20 pointer-events-none"></div>
+            <div className="absolute bottom-0 right-0 w-48 h-48 bg-blue-500/10 rounded-full blur-[60px] -mr-10 -mb-10 transition-all duration-700 group-hover:bg-blue-500/20 pointer-events-none"></div>
             
             <div className="relative z-10 flex flex-col h-full justify-between">
               <div>
-                <div className="p-3 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl border border-white/10 inline-block mb-5 shadow-[0_0_15px_rgba(168,85,247,0.2)]">
-                  <Zap size={24} className="text-purple-400" />
+                <div className="p-3 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl border border-white/10 inline-block mb-5 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+                  <Zap size={24} className="text-blue-400" />
                 </div>
                 <h3 className="text-2xl font-bold mb-3">Ranked Battle</h3>
                 <p className="text-gray-400 text-sm leading-relaxed mb-6 font-medium">
@@ -209,20 +266,44 @@ const DashboardPage: React.FC = () => {
               <button 
                 onClick={handleFindMatch}
                 disabled={isSearching}
-                className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white px-4 py-3.5 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:shadow-[0_0_25px_rgba(168,85,247,0.6)] hover:-translate-y-0.5 flex items-center justify-center gap-2 border border-purple-400/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-4 py-3.5 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:shadow-[0_0_25px_rgba(59,130,246,0.6)] hover:-translate-y-0.5 flex items-center justify-center gap-2 border border-blue-400/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 mt-auto"
               >
                 {isSearching ? <Loader2 size={18} className="animate-spin" /> : <Swords size={18} />}
                 {isSearching ? 'Searching...' : 'Find Match'}
               </button>
             </div>
           </div>
+
+          {/* Practice Mode Card */}
+          <div className="glass-panel p-8 rounded-3xl border border-green-500/30 flex flex-col items-center text-center relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/20 blur-[50px] rounded-full group-hover:bg-green-500/40 transition-colors pointer-events-none"></div>
+            
+            <div className="w-16 h-16 bg-green-500/20 rounded-2xl flex items-center justify-center mb-6 border border-green-500/50 shadow-[0_0_15px_rgba(34,197,94,0.4)]">
+              <BrainCircuit size={32} className="text-green-400" />
+            </div>
+            
+            <h2 className="text-2xl font-black text-white mb-2 tracking-tight">Zen Sandbox</h2>
+            <p className="text-gray-400 font-medium mb-8 text-sm">Practice problems stress-free with no timer or rating changes.</p>
+            
+            <button 
+              onClick={handleStartPractice}
+              disabled={isStartingSolo}
+              className="w-full mt-auto bg-green-600 hover:bg-green-500 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:shadow-[0_0_30px_rgba(34,197,94,0.5)] flex items-center justify-center gap-2"
+            >
+              {isStartingSolo ? <Loader2 className="animate-spin" size={20} /> : <><BrainCircuit size={20} /> Start Practice</>}
+            </button>
+          </div>
+
         </div>
 
         {/* Stats Section */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-4">
           <div className="glass-panel rounded-2xl p-6 border border-white/5 flex flex-col items-center justify-center text-center hover:bg-white/[0.02] transition-colors">
             <Trophy size={28} className="text-yellow-400 mb-3 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]" />
-            <span className="text-3xl font-black text-white tracking-tight">{elo}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-3xl font-black text-white tracking-tight">{elo}</span>
+              <RankBadge elo={elo} size="sm" />
+            </div>
             <span className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Elo Rating</span>
           </div>
           <div className="glass-panel rounded-2xl p-6 border border-white/5 flex flex-col items-center justify-center text-center hover:bg-white/[0.02] transition-colors">
@@ -243,7 +324,6 @@ const DashboardPage: React.FC = () => {
         </div>
 
       </main>
-
 
     </div>
   );

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Swords, History, ArrowLeft, Trophy, XCircle } from 'lucide-react';
 import { useArenaStore } from '../store/useArenaStore';
+import { ReplayModal } from '../components/ReplayModal';
 
 interface MatchRecord {
   id: string;
@@ -12,8 +13,10 @@ interface MatchRecord {
 }
 
 const HistoryPage: React.FC = () => {
+  const navigate = useNavigate();
   const [matches, setMatches] = useState<MatchRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedMatch, setSelectedMatch] = useState<{ id: string, opponentName: string } | null>(null);
   const currentUserId = useArenaStore((state) => state.userId);
 
   useEffect(() => {
@@ -40,9 +43,9 @@ const HistoryPage: React.FC = () => {
       </div>
 
       <header className="relative z-10 flex items-center justify-between mb-12 max-w-4xl mx-auto w-full">
-        <Link to="/dashboard" className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors glass-panel px-4 py-2 rounded-xl">
-          <ArrowLeft size={18} /> Back to Dashboard
-        </Link>
+        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors glass-panel px-4 py-2 rounded-xl">
+          <ArrowLeft size={18} /> Back
+        </button>
         <div className="flex items-center gap-3">
           <div className="p-2 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-lg border border-white/10 shadow-[0_0_15px_rgba(59,130,246,0.3)]">
             <History size={24} className="text-blue-400" />
@@ -67,7 +70,11 @@ const HistoryPage: React.FC = () => {
                 const date = new Date(match.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
                 
                 return (
-                  <div key={match.id} className="glass-panel px-6 py-5 rounded-2xl border border-white/5 flex items-center justify-between hover:bg-white/[0.04] transition-colors">
+                  <div 
+                    key={match.id} 
+                    onClick={() => setSelectedMatch({ id: match.id, opponentName: opponent?.username || 'AI Bot' })}
+                    className="glass-panel px-6 py-5 rounded-2xl border border-white/5 flex items-center justify-between hover:bg-white/10 transition-all cursor-pointer group hover:scale-[1.01]"
+                  >
                     <div className="flex items-center gap-6">
                       <div className={`w-14 h-14 rounded-full flex items-center justify-center border shadow-lg ${
                         isWinner ? 'bg-green-500/20 border-green-500/30 text-green-400 shadow-green-500/20' : 
@@ -108,6 +115,14 @@ const HistoryPage: React.FC = () => {
           )}
         </div>
       </main>
+
+      {selectedMatch && (
+        <ReplayModal 
+          matchId={selectedMatch.id} 
+          opponentUsername={selectedMatch.opponentName} 
+          onClose={() => setSelectedMatch(null)} 
+        />
+      )}
     </div>
   );
 };

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Swords, ArrowLeft, Trophy, Flame, Target, Users, Zap, Clock, Loader2, History, LogOut, Check } from 'lucide-react';
 import { useArenaStore } from '../store/useArenaStore';
+import { RankBadge } from '../components/RankBadge';
 
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
@@ -87,10 +88,10 @@ const ProfilePage: React.FC = () => {
 
       {/* Header */}
       <header className="relative z-10 glass-panel border-b border-white/5 px-8 py-4 flex items-center justify-between">
-        <Link to="/dashboard" className="flex items-center gap-3 hover:opacity-80 transition-opacity text-gray-300">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-3 hover:opacity-80 transition-opacity text-gray-300">
           <ArrowLeft size={20} />
-          <span className="font-bold">Back to Dashboard</span>
-        </Link>
+          <span className="font-bold">Back</span>
+        </button>
         <button onClick={handleLogout} className="flex items-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 px-4 py-2 rounded-xl transition-colors font-bold text-sm border border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
           <LogOut size={16} /> Logout
         </button>
@@ -181,8 +182,11 @@ const ProfilePage: React.FC = () => {
                 <Trophy size={32} className="text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]" />
               </div>
               <div>
-                <div className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-1">Elo Rating</div>
-                <div className="text-3xl font-black">{elo}</div>
+                <div className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-2">Elo Rating</div>
+                <div className="flex items-center gap-3">
+                  <div className="text-3xl font-black">{elo}</div>
+                  <RankBadge elo={elo} size="md" />
+                </div>
               </div>
             </div>
             

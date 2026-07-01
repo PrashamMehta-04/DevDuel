@@ -20,6 +20,7 @@ interface WaitingPlayer {
   userId: string;
   rating: number;
   socketId: string;
+  username: string;
 }
 
 interface ActiveMatchPlayer {
@@ -39,6 +40,11 @@ interface ActiveMatch {
 }
 
 const activeMatches: Record<string, ActiveMatch> = {};
+interface PrivateRoom {
+  roomCode: string;
+  creator: { userId: string, socketId: string, rating: number, username: string };
+}
+const privateRooms: Record<string, PrivateRoom> = {};
 const MATCH_DURATION = 30 * 60 * 1000; // 30 mins
 let matchmakingQueue: WaitingPlayer[] = [];
 
@@ -586,6 +592,26 @@ app.get('/api/users/:userId/matches', async (req, res) => {
   }
 });
 
+app.get('/api/matches/:matchId/submissions', async (req, res) => {
+  try {
+    const submissions = await prisma.submission.findMany({
+      where: { matchId: req.params.matchId },
+      orderBy: { id: 'desc' }, // Latest first
+    });
+    // Group by user and only get their latest submission
+    const finalSubmissions: Record<string, any> = {};
+    for (const sub of submissions) {
+      if (!finalSubmissions[sub.userId]) {
+        finalSubmissions[sub.userId] = sub;
+      }
+    }
+    res.json(Object.values(finalSubmissions));
+  } catch (error) {
+    console.error('Match submissions error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
@@ -642,15 +668,11 @@ async function endMatch(matchId: string, reason: string) {
     try {
       const realPlayers = playerIds.filter(id => !id.startsWith('Bot_'));
       if (realPlayers.length > 0) {
-        await prisma.match.create({
+        await prisma.match.update({
+          where: { id: matchId },
           data: {
-            id: matchId,
             status: 'COMPLETED',
-            problemId: 'two-sum',
             winnerId: winnerId,
-            players: {
-              connect: realPlayers.map(id => ({ id }))
-            }
           }
         });
 
@@ -682,6 +704,16 @@ async function endMatch(matchId: string, reason: string) {
     };
 
     io.to(matchId).emit(SOCKET_EVENTS.MATCH_OVER, payload);
+  } else if (playerIds.length === 1) {
+    const payload: MatchOverPayload = {
+      matchId,
+      winnerId: playerIds[0],
+      loserId: null,
+      winnerEloChange: 0,
+      loserEloChange: 0,
+      reason: 'Sandbox Completed!'
+    };
+    io.to(matchId).emit(SOCKET_EVENTS.MATCH_OVER, payload);
   }
   delete activeMatches[matchId];
 }
@@ -710,6 +742,7 @@ queueEvents.on('completed', async ({ jobId }) => {
           data: {
             userId: result.userId,
             problemId: job.data.problemId,
+            matchId: !result.matchId.startsWith('solo') ? result.matchId : null,
             code: job.data.code,
             language: job.data.language,
             status: result.success ? "Accepted" : (result.results?.find(r => r.error)?.error ? "Runtime Error" : "Wrong Answer"),
@@ -772,9 +805,157 @@ io.on('connection', (socket) => {
     console.log(`[Socket] 🏠 User ${socket.id} joined match room: ${matchId}`);
   });
 
-  socket.on(SOCKET_EVENTS.FIND_MATCH, async (payload: { userId: string, rating: number }) => {
+  socket.on(SOCKET_EVENTS.START_PRACTICE, async (payload: { userId: string, username: string }) => {
+    payload.userId = socket.data.userId;
+    
+    // Helper to get random unsolved problem
+    const getRandomUnsolvedProblem = async (userIds: string[]) => {
+      const solvedMatches = await prisma.match.findMany({
+        where: { winnerId: { in: userIds } },
+        select: { problemId: true }
+      });
+      const solvedIds = new Set(solvedMatches.map(m => m.problemId));
+      const problems = await prisma.problem.findMany();
+      const unsolved = problems.filter(p => !solvedIds.has(p.id));
+      if (unsolved.length > 0) return unsolved[Math.floor(Math.random() * unsolved.length)];
+      return problems[Math.floor(Math.random() * problems.length)];
+    };
+
+    const randomProblem = await getRandomUnsolvedProblem([payload.userId]);
+    const matchId = `solo-${Date.now()}`;
+    const startTime = Date.now();
+    
+    // We don't save solo matches to the DB to keep them entirely separate from history and Elo
+    activeMatches[matchId] = {
+      matchId,
+      problem: randomProblem,
+      players: {
+        [payload.userId]: { userId: payload.userId, socketId: socket.id, rating: 1200, score: 0, lastSubmitTime: 0, username: payload.username }
+      }
+      // No timer for Zen Mode Sandbox!
+    };
+
+    const startPayload: MatchStartPayload = { 
+      matchId, 
+      opponentId: 'practice', 
+      startTime, 
+      endTime: startTime + 31536000000, // 1 year timer (virtually infinite)
+      problem: { 
+        id: randomProblem.id, 
+        title: randomProblem.title, 
+        description: randomProblem.description, 
+        defaultCode: randomProblem.defaultCode as any 
+      } 
+    };
+
+    io.to(socket.id).emit(SOCKET_EVENTS.MATCH_FOUND, startPayload);
+  });
+
+  socket.on(SOCKET_EVENTS.SEND_EMOTE, (payload: { matchId: string, emote: string }) => {
+    socket.to(payload.matchId).emit(SOCKET_EVENTS.RECEIVE_EMOTE, { emote: payload.emote });
+  });
+
+  // Private Match Handlers
+  socket.on(SOCKET_EVENTS.CREATE_PRIVATE_MATCH, (payload: { userId: string, username: string, rating: number }) => {
+    payload.userId = socket.data.userId;
+    const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    privateRooms[roomCode] = {
+      roomCode,
+      creator: { userId: payload.userId, username: payload.username, socketId: socket.id, rating: payload.rating }
+    };
+    console.log(`[Socket] 🔒 User ${payload.userId} created private room: ${roomCode}`);
+    io.to(socket.id).emit(SOCKET_EVENTS.PRIVATE_MATCH_CREATED, { roomCode });
+  });
+
+  socket.on(SOCKET_EVENTS.JOIN_PRIVATE_MATCH, async (payload: { userId: string, username: string, rating: number, roomCode: string }) => {
+    payload.userId = socket.data.userId;
+    const roomCode = payload.roomCode.toUpperCase();
+    const room = privateRooms[roomCode];
+
+    if (!room) {
+      io.to(socket.id).emit(SOCKET_EVENTS.JOIN_PRIVATE_MATCH_ERROR, { error: 'Invalid room code or room no longer exists' });
+      return;
+    }
+
+    if (room.creator.userId === payload.userId) {
+      io.to(socket.id).emit(SOCKET_EVENTS.JOIN_PRIVATE_MATCH_ERROR, { error: 'You cannot join your own room' });
+      return;
+    }
+
+    // Room found, let's match them!
+    const opponent = room.creator;
+    delete privateRooms[roomCode]; // Remove room once filled
+
+    const matchId = `match-private-${Date.now()}-${roomCode}`;
+    console.log(`[Socket] ⚔️ Private Match started: ${opponent.userId} vs ${payload.userId} (Room: ${roomCode})`);
+
+    const startTime = Date.now();
+    const endTime = startTime + MATCH_DURATION;
+
+    // Helper to get random unsolved problem
+    const getRandomUnsolvedProblem = async (userIds: string[]) => {
+      const solvedMatches = await prisma.match.findMany({
+        where: { winnerId: { in: userIds } },
+        select: { problemId: true }
+      });
+      const solvedIds = new Set(solvedMatches.map(m => m.problemId));
+      const problems = await prisma.problem.findMany();
+      const unsolved = problems.filter(p => !solvedIds.has(p.id));
+      
+      if (unsolved.length > 0) {
+        return unsolved[Math.floor(Math.random() * unsolved.length)];
+      }
+      return problems[Math.floor(Math.random() * problems.length)];
+    };
+    
+    const randomProblem = await getRandomUnsolvedProblem([payload.userId, opponent.userId]);
+
+    await prisma.match.create({
+      data: {
+        id: matchId,
+        status: 'IN_PROGRESS',
+        problemId: randomProblem.id,
+        players: { connect: [{ id: payload.userId }, { id: opponent.userId }] }
+      }
+    });
+
+    activeMatches[matchId] = {
+      matchId,
+      problem: randomProblem,
+      players: {
+        [payload.userId]: { userId: payload.userId, socketId: socket.id, rating: payload.rating, score: 0, lastSubmitTime: 0 },
+        [opponent.userId]: { userId: opponent.userId, socketId: opponent.socketId, rating: opponent.rating, score: 0, lastSubmitTime: 0 }
+      },
+      timer: setTimeout(() => endMatch(matchId, 'Time expired'), MATCH_DURATION)
+    };
+
+    const startPayload1: MatchStartPayload = { matchId, opponentId: opponent.userId, opponentUsername: opponent.username, opponentRating: opponent.rating, startTime, endTime, problem: { id: randomProblem.id, title: randomProblem.title, description: randomProblem.description, defaultCode: randomProblem.defaultCode as any } };
+    const startPayload2: MatchStartPayload = { matchId, opponentId: payload.userId, opponentUsername: payload.username, opponentRating: payload.rating, startTime, endTime, problem: { id: randomProblem.id, title: randomProblem.title, description: randomProblem.description, defaultCode: randomProblem.defaultCode as any } };
+
+    // Notify both players
+    io.to(socket.id).emit(SOCKET_EVENTS.MATCH_FOUND, startPayload1);
+    io.to(opponent.socketId).emit(SOCKET_EVENTS.MATCH_FOUND, startPayload2);
+  });
+
+  socket.on(SOCKET_EVENTS.FIND_MATCH, async (payload: { userId: string, username: string, rating: number }) => {
     payload.userId = socket.data.userId; // Secure override
-    console.log(`[Socket] 🔍 User ${payload.userId} (Rating: ${payload.rating}) is looking for a match.`);
+    console.log(`[Socket] 🔍 User ${payload.userId} (${payload.username}, Rating: ${payload.rating}) is looking for a match.`);
+
+    // Helper to get random unsolved problem
+    const getRandomUnsolvedProblem = async (userIds: string[]) => {
+      const solvedMatches = await prisma.match.findMany({
+        where: { winnerId: { in: userIds } },
+        select: { problemId: true }
+      });
+      const solvedIds = new Set(solvedMatches.map(m => m.problemId));
+      const problems = await prisma.problem.findMany();
+      const unsolved = problems.filter(p => !solvedIds.has(p.id));
+      
+      if (unsolved.length > 0) {
+        return unsolved[Math.floor(Math.random() * unsolved.length)];
+      }
+      return problems[Math.floor(Math.random() * problems.length)];
+    };
 
     // Check if there is a suitable opponent in the queue (within 200 rating points)
     const RATING_TOLERANCE = 200;
@@ -790,8 +971,16 @@ io.on('connection', (socket) => {
       const startTime = Date.now();
       const endTime = startTime + MATCH_DURATION;
       
-      const problems = await prisma.problem.findMany();
-      const randomProblem = problems[Math.floor(Math.random() * problems.length)];
+      const randomProblem = await getRandomUnsolvedProblem([payload.userId, opponent.userId]);
+
+      await prisma.match.create({
+        data: {
+          id: matchId,
+          status: 'IN_PROGRESS',
+          problemId: randomProblem.id,
+          players: { connect: [{ id: payload.userId }, { id: opponent.userId }] }
+        }
+      });
 
       // Create Active Match
       activeMatches[matchId] = {
@@ -804,15 +993,15 @@ io.on('connection', (socket) => {
         timer: setTimeout(() => endMatch(matchId, 'Time expired'), MATCH_DURATION)
       };
 
-      const startPayload1: MatchStartPayload = { matchId, opponentId: opponent.userId, startTime, endTime, problem: { id: randomProblem.id, title: randomProblem.title, description: randomProblem.description, defaultCode: randomProblem.defaultCode as any } };
-      const startPayload2: MatchStartPayload = { matchId, opponentId: payload.userId, startTime, endTime, problem: { id: randomProblem.id, title: randomProblem.title, description: randomProblem.description, defaultCode: randomProblem.defaultCode as any } };
+      const startPayload1: MatchStartPayload = { matchId, opponentId: opponent.userId, opponentUsername: opponent.username, opponentRating: opponent.rating, startTime, endTime, problem: { id: randomProblem.id, title: randomProblem.title, description: randomProblem.description, defaultCode: randomProblem.defaultCode as any } };
+      const startPayload2: MatchStartPayload = { matchId, opponentId: payload.userId, opponentUsername: payload.username, opponentRating: payload.rating, startTime, endTime, problem: { id: randomProblem.id, title: randomProblem.title, description: randomProblem.description, defaultCode: randomProblem.defaultCode as any } };
 
       // Notify both players
       io.to(socket.id).emit(SOCKET_EVENTS.MATCH_FOUND, startPayload1);
       io.to(opponent.socketId).emit(SOCKET_EVENTS.MATCH_FOUND, startPayload2);
     } else {
       // No match found immediately, add to queue
-      matchmakingQueue.push({ userId: payload.userId, rating: payload.rating, socketId: socket.id });
+      matchmakingQueue.push({ userId: payload.userId, username: payload.username, rating: payload.rating, socketId: socket.id });
 
       // Start a 15-second timer for AI Bot fallback
       setTimeout(async () => {
@@ -825,9 +1014,17 @@ io.on('connection', (socket) => {
           const startTime = Date.now();
           const endTime = startTime + MATCH_DURATION;
           
-          const problems = await prisma.problem.findMany();
-          const randomProblem = problems[Math.floor(Math.random() * problems.length)];
+          const randomProblem = await getRandomUnsolvedProblem([player.userId]);
           
+          await prisma.match.create({
+            data: {
+              id: matchId,
+              status: 'IN_PROGRESS',
+              problemId: randomProblem.id,
+              players: { connect: [{ id: player.userId }] }
+            }
+          });
+
           console.log(`[Socket] 🤖 Spawning AI Bot Match: ${player.userId} (Elo: ${player.rating}) vs ${botId}`);
 
           // Scale Bot Difficulty based on Player's Elo

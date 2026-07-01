@@ -19,12 +19,13 @@ model User {
 }
 
 model Match {
-  id        String   @id @default(uuid())
-  status    String   @default("WAITING")
-  problemId String
-  winnerId  String?
-  createdAt DateTime @default(now())
-  players   User[]
+  id          String       @id @default(uuid())
+  status      String       @default("WAITING")
+  problemId   String
+  winnerId    String?
+  createdAt   DateTime     @default(now())
+  players     User[]
+  submissions Submission[]
 }
 
 model Problem {
@@ -44,6 +45,8 @@ model Submission {
   user        User     @relation(fields: [userId], references: [id])
   problemId   String
   problem     Problem  @relation(fields: [problemId], references: [id])
+  matchId     String?
+  match       Match?   @relation(fields: [matchId], references: [id])
   code        String
   language    String
   status      String

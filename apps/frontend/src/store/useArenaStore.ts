@@ -20,6 +20,8 @@ interface ArenaState {
     defaultCode?: Record<string, string>;
   };
   opponentProgress: number;
+  opponentUsername: string | null;
+  opponentElo: number | null;
   isOpponentTyping: boolean;
   isConnected: boolean;
   matchEndTime: number | null;
@@ -33,6 +35,8 @@ interface ArenaState {
   setCode: (code: string) => void;
   setLanguage: (lang: string) => void;
   setOpponentProgress: (progress: number) => void;
+  setOpponentUsername: (username: string | null) => void;
+  setOpponentElo: (elo: number | null) => void;
   setIsOpponentTyping: (isTyping: boolean) => void;
   setIsConnected: (connected: boolean) => void;
   setMatchEndTime: (time: number | null) => void;
@@ -83,6 +87,8 @@ export const useArenaStore = create<ArenaState>()(
         }
       },
       opponentProgress: 0,
+      opponentUsername: null,
+      opponentElo: null,
       isOpponentTyping: false,
       isConnected: false,
       matchEndTime: null,
@@ -105,6 +111,8 @@ export const useArenaStore = create<ArenaState>()(
       },
       setDefaultLanguage: (lang) => set({ defaultLanguage: lang }),
       setOpponentProgress: (progress) => set({ opponentProgress: progress }),
+      setOpponentUsername: (username) => set({ opponentUsername: username }),
+      setOpponentElo: (elo) => set({ opponentElo: elo }),
       setIsOpponentTyping: (isOpponentTyping) => set({ isOpponentTyping }),
       setIsConnected: (isConnected) => set({ isConnected }),
       setMatchEndTime: (matchEndTime) => set({ matchEndTime }),
