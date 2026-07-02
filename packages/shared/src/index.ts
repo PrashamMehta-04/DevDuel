@@ -30,8 +30,7 @@ export const SOCKET_EVENTS = {
   PRIVATE_MATCH_CREATED: 'match:private_created',
   JOIN_PRIVATE_MATCH: 'match:join_private',
   JOIN_PRIVATE_MATCH_ERROR: 'match:join_private_error',
-  SEND_EMOTE: 'match:send_emote',
-  RECEIVE_EMOTE: 'match:receive_emote',
+
   START_PRACTICE: 'match:start_practice',
 } as const;
 

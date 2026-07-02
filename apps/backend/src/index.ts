@@ -745,7 +745,14 @@ queueEvents.on('completed', async ({ jobId }) => {
             matchId: !result.matchId.startsWith('solo') ? result.matchId : null,
             code: job.data.code,
             language: job.data.language,
-            status: result.success ? "Accepted" : (result.results?.find(r => r.error)?.error ? "Runtime Error" : "Wrong Answer"),
+            status: (() => {
+              if (result.success) return "Accepted";
+              const err = result.results?.find(r => r.error && r.error !== 'Wrong Answer')?.error;
+              if (!err) return "Wrong Answer";
+              if (err.includes("Time Limit Exceeded")) return "Time Limit Exceeded";
+              if (err.toLowerCase().includes("compile") || err.toLowerCase().includes("syntax") || err.toLowerCase().includes("compilation")) return "Compilation Error";
+              return "Runtime Error";
+            })(),
           }
         });
       } catch (err) {
@@ -767,11 +774,13 @@ queueEvents.on('completed', async ({ jobId }) => {
     const emitResult = io.to(result.matchId).emit(SOCKET_EVENTS.TEST_RESULT, result);
     console.log(`[Backend] Emit Test Result success: ${!!emitResult}`);
     
-    // Also notify about progress
-    io.to(result.matchId).emit(SOCKET_EVENTS.OPPONENT_PROGRESS, {
-      userId: result.userId,
-      progress: result.overallProgress
-    });
+    // Also notify about progress only on actual submissions
+    if (result.type === 'submit') {
+      io.to(result.matchId).emit(SOCKET_EVENTS.OPPONENT_PROGRESS, {
+        userId: result.userId,
+        progress: result.overallProgress
+      });
+    }
 
     // Check for win condition
     if (result.success && result.type === 'submit') {
@@ -851,9 +860,7 @@ io.on('connection', (socket) => {
     io.to(socket.id).emit(SOCKET_EVENTS.MATCH_FOUND, startPayload);
   });
 
-  socket.on(SOCKET_EVENTS.SEND_EMOTE, (payload: { matchId: string, emote: string }) => {
-    socket.to(payload.matchId).emit(SOCKET_EVENTS.RECEIVE_EMOTE, { emote: payload.emote });
-  });
+
 
   // Private Match Handlers
   socket.on(SOCKET_EVENTS.CREATE_PRIVATE_MATCH, (payload: { userId: string, username: string, rating: number }) => {
@@ -868,6 +875,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on(SOCKET_EVENTS.JOIN_PRIVATE_MATCH, async (payload: { userId: string, username: string, rating: number, roomCode: string }) => {
+    console.log(`[Socket] 🚪 User ${socket.data.userId} trying to join private room: ${payload.roomCode}`);
     payload.userId = socket.data.userId;
     const roomCode = payload.roomCode.toUpperCase();
     const room = privateRooms[roomCode];
@@ -1113,16 +1121,14 @@ io.on('connection', (socket) => {
            where: { id: searchId }
          });
          
-         if (!problem && searchId !== 'two-sum') {
-            problem = await prisma.problem.findUnique({ where: { id: 'two-sum' } });
-         }
+
 
          if (problem) {
             problemId = problem.id;
             testCases = problem.testCases as any[];
          } else {
             console.error(`[Socket] ❌ Could not find problem for matchId: ${payload.matchId}`);
-            socket.emit(SOCKET_EVENTS.TEST_RESULT, { userId: payload.userId, success: false, results: [], error: 'Problem not found' });
+            socket.emit(SOCKET_EVENTS.TEST_RESULT, { userId: payload.userId, success: false, results: [], error: 'Match session expired or server restarted. Please start a new match.' });
             return;
          }
       }

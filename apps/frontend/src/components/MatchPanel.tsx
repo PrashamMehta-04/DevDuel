@@ -210,7 +210,7 @@ const MatchPanel: React.FC = () => {
                   </span>
                   {opponentElo && <RankBadge elo={opponentElo} size="sm" />}
                 </div>
-                <span className="text-lg font-black text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]">{opponentProgress}%</span>
+                <span className="text-lg font-black text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]">{Number(opponentProgress).toFixed(2)}%</span>
               </div>
               <div className="w-full bg-black/50 rounded-full h-3 p-0.5 border border-white/5 shadow-inner">
                 <div 

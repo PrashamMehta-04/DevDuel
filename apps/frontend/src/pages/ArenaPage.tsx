@@ -10,8 +10,7 @@ import { Link, useNavigate } from 'react-router-dom';
 const ArenaPage: React.FC = () => {
   const navigate = useNavigate();
   const [timeLeft, setTimeLeft] = useState<string>('30:00');
-  const [receivedEmote, setReceivedEmote] = useState<{ emoji: string, id: number } | null>(null);
-  const [sentEmote, setSentEmote] = useState<{ emoji: string, id: number } | null>(null);
+
   const { isConnected, setIsConnected, setIsOpponentTyping, setOpponentProgress, matchId, gameMode, matchOverResult, setMatchOverResult, userId, matchEndTime } = useArenaStore();
 
   useEffect(() => {
@@ -68,10 +67,6 @@ const ArenaPage: React.FC = () => {
       useArenaStore.getState().setMatchOverResult(payload);
     }
 
-    function onReceiveEmote(payload: { emote: string }) {
-      setReceivedEmote({ emoji: payload.emote, id: Date.now() });
-      setTimeout(() => setReceivedEmote(null), 3000);
-    }
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
@@ -79,7 +74,6 @@ const ArenaPage: React.FC = () => {
     socket.on(SOCKET_EVENTS.OPPONENT_PROGRESS, onOpponentProgress);
     socket.on(SOCKET_EVENTS.TEST_RESULT, onTestResult);
     socket.on(SOCKET_EVENTS.MATCH_OVER, onMatchOver);
-    socket.on(SOCKET_EVENTS.RECEIVE_EMOTE, onReceiveEmote);
 
     // CRITICAL FIX: If socket is already connected when this component mounts, we must trigger onConnect manually
     if (socket.connected) {
@@ -93,17 +87,9 @@ const ArenaPage: React.FC = () => {
       socket.off(SOCKET_EVENTS.OPPONENT_PROGRESS, onOpponentProgress);
       socket.off(SOCKET_EVENTS.TEST_RESULT, onTestResult);
       socket.off(SOCKET_EVENTS.MATCH_OVER, onMatchOver);
-      socket.off(SOCKET_EVENTS.RECEIVE_EMOTE, onReceiveEmote);
     };
   }, [matchId, setIsConnected, setIsOpponentTyping, setOpponentProgress]);
 
-  const EMOTES = ['🚀', '🔥', '💀', '👀', '😅'];
-
-  const handleSendEmote = (emote: string) => {
-    socket.emit(SOCKET_EVENTS.SEND_EMOTE, { matchId, emote });
-    setSentEmote({ emoji: emote, id: Date.now() });
-    setTimeout(() => setSentEmote(null), 3000);
-  };
 
   return (
     <div className="h-screen w-screen relative overflow-hidden bg-[#0B0F19]">
@@ -115,19 +101,7 @@ const ArenaPage: React.FC = () => {
       </div>
 
       <div className="relative z-10 flex flex-col h-full">
-        {/* Floating Emotes Layer */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden z-50">
-          {receivedEmote && (
-            <div key={`rx-${receivedEmote.id}`} className="absolute top-[30%] left-[60%] text-7xl animate-bounce drop-shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all">
-              {receivedEmote.emoji}
-            </div>
-          )}
-          {sentEmote && (
-            <div key={`tx-${sentEmote.id}`} className="absolute top-[80%] left-[30%] text-5xl animate-bounce drop-shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all">
-              {sentEmote.emoji}
-            </div>
-          )}
-        </div>
+
 
         {/* Header */}
         <header className="h-16 glass-panel border-b-0 border-white/5 flex items-center justify-between px-8 flex-shrink-0 mb-4 mx-4 mt-4 rounded-2xl relative z-40">
@@ -146,19 +120,7 @@ const ArenaPage: React.FC = () => {
           <div className="flex items-center gap-4">
             {gameMode === 'battle' && (
               <>
-                <div className="flex items-center gap-2 px-3 py-1.5 glass-panel rounded-full border border-white/10 shadow-inner bg-black/20">
-                  <span className="text-xs font-bold text-gray-400 uppercase tracking-widest mr-1">React:</span>
-                  {EMOTES.map(emote => (
-                    <button 
-                      key={emote}
-                      onClick={() => handleSendEmote(emote)}
-                      className="hover:scale-125 hover:-translate-y-1 transition-all text-sm"
-                      title="Send Emote"
-                    >
-                      {emote}
-                    </button>
-                  ))}
-                </div>
+
                 <div className="flex items-center gap-2 px-4 py-1.5 glass-panel rounded-full border border-white/10 shadow-inner bg-black/20">
                   <Clock size={14} className="text-gray-400" />
                   <span className="text-sm font-bold tracking-widest font-mono text-gray-200">
