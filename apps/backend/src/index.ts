@@ -11,7 +11,7 @@ import type { CodeUpdatePayload, SubmissionResultPayload, SubmissionPayload, Mat
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
-
+import { GoogleGenAI } from '@google/genai';
 dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'devduel-super-secret-key';
@@ -50,7 +50,7 @@ let matchmakingQueue: WaitingPlayer[] = [];
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 const prisma = new PrismaClient();
 
@@ -267,9 +267,94 @@ app.get('/api/problems/:problemId/submissions', async (req, res) => {
   }
 });
 
+app.post('/api/problems/generate', adminAuth, async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
+
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ error: 'GEMINI_API_KEY is not set in backend environment variables' });
+    }
+
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    
+    const systemPrompt = `You are an expert technical interviewer and competitive programming platform administrator.
+Your task is to generate a coding problem based on the user's prompt. 
+You must output ONLY a valid JSON object with the following exact structure, no markdown formatting outside the JSON, no extra text:
+{
+  "title": "Problem Title",
+  "description": "Markdown formatted problem description. Explain the problem clearly, give an example or two.",
+  "constraints": "- 1 <= n <= 10^5\\n- etc...",
+  "difficulty": "EASY", // Must be one of: EASY, MEDIUM, HARD
+  "defaultCode": {
+    "javascript": "function solution(args) {\\n    \\n}",
+    "python": "def solution(args):\\n    pass",
+    "java": "class Solution {\\n    public int solution(int args) {\\n        return 0;\\n    }\\n}",
+    "cpp": "class Solution {\\npublic:\\n    int solution(int args) {\\n        return 0;\\n    }\\n};"
+  },
+  "testCases": [
+    {
+      "input": "[1, 2, 3]", // MUST BE A STRINGIFIED VALID JSON ARRAY of arguments! e.g. "[1, 2, 3]" for a single array arg, or "[5, 10]" for two int args
+      "expected": "6", // MUST BE STRINGIFIED JSON of the expected return value
+      "isHidden": false
+    },
+    {
+      "input": "[ [1, 2], 3 ]", // Example for two arguments: an array and an int
+      "expected": "true", // Example of boolean return
+      "isHidden": true
+    }
+  ]
+}
+Make sure you include at least 5 test cases, with at least 2 hidden. Ensure inputs and expected values exactly match JSON stringification rules so our system can parse them via JSON.parse(). Use valid escape characters. 
+CRITICAL: DO NOT generate massive arrays or strings (e.g., > 50 elements) directly in "input" or "expected" fields. LLM output limits will cause the JSON to truncate and break.
+If the user asks for huge test cases (like thousands of elements), DO NOT hardcode them. Instead, replace "input" and "expected" with a single "__generateScript__" field containing valid Javascript code that when evaluated inside a Function, returns an object with "input" and "expected" stringified values.
+Example for generating massive arrays:
+{
+  "__generateScript__": "const arr = Array.from({length: 2800}, () => Math.floor(Math.random() * 200000) - 100000); return { input: JSON.stringify([arr]), expected: JSON.stringify(arr.reduce((a,b)=>a+b, 0)) };",
+  "isHidden": true
+}
+Our backend will execute this script and generate the giant payload on the server, saving you tokens!`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        systemInstruction: systemPrompt,
+        responseMimeType: 'application/json',
+      }
+    });
+
+    const resultText = response.text || '';
+    const generatedProblem = JSON.parse(resultText);
+
+    if (Array.isArray(generatedProblem.testCases)) {
+      for (const tc of generatedProblem.testCases) {
+        if (tc.__generateScript__) {
+          try {
+            const scriptFn = new Function(tc.__generateScript__);
+            const generated = scriptFn();
+            tc.input = generated.input;
+            tc.expected = generated.expected;
+            delete tc.__generateScript__;
+          } catch (e) {
+            console.error('Failed to run test case generateScript', e);
+            tc.input = "[\"ERROR_GENERATING_LARGE_TEST_CASE\"]";
+            tc.expected = "\"ERROR\"";
+          }
+        }
+      }
+    }
+
+    res.json(generatedProblem);
+  } catch (error: any) {
+    console.error('Error generating AI problem:', error);
+    res.status(500).json({ error: 'Failed to generate problem with AI: ' + error.message });
+  }
+});
+
 app.post('/api/problems', adminAuth, async (req, res) => {
   try {
-    const { title, description, constraints, difficulty, testCases } = req.body;
+    const { title, description, constraints, difficulty, testCases, defaultCode } = req.body;
     
     const problem = await prisma.problem.create({
       data: {
@@ -278,6 +363,7 @@ app.post('/api/problems', adminAuth, async (req, res) => {
         constraints,
         difficulty: difficulty || 'EASY',
         testCases, // Expects a JSON array
+        defaultCode,
       }
     });
     
@@ -302,7 +388,7 @@ app.get('/api/problems', async (req, res) => {
 app.put('/api/problems/:problemId', adminAuth, async (req, res) => {
   try {
     const { problemId } = req.params;
-    const { title, description, constraints, difficulty, testCases } = req.body;
+    const { title, description, constraints, difficulty, testCases, defaultCode } = req.body;
     
     const problem = await prisma.problem.update({
       where: { id: problemId },
@@ -312,6 +398,7 @@ app.put('/api/problems/:problemId', adminAuth, async (req, res) => {
         constraints,
         difficulty: difficulty || 'EASY',
         testCases,
+        defaultCode,
       }
     });
     
@@ -660,8 +747,10 @@ async function endMatch(matchId: string, reason: string) {
     let winnerEloChange = 0;
     let loserEloChange = 0;
     if (winnerId) {
-      winnerEloChange = 25;
-      loserEloChange = -25;
+      if (!matchId.startsWith('match-private-')) {
+        winnerEloChange = 25;
+        loserEloChange = -25;
+      }
     }
 
     // Save match to database and update Elo
@@ -1090,7 +1179,7 @@ io.on('connection', (socket) => {
             botInterval
           };
 
-          io.to(player.socketId).emit(SOCKET_EVENTS.MATCH_FOUND, { matchId, opponentId: botId, startTime, endTime, problem: { id: randomProblem.id, title: randomProblem.title, description: randomProblem.description, defaultCode: randomProblem.defaultCode as any } });
+          io.to(player.socketId).emit(SOCKET_EVENTS.MATCH_FOUND, { matchId, opponentId: botId, opponentUsername: botId, opponentRating: player.rating, startTime, endTime, problem: { id: randomProblem.id, title: randomProblem.title, description: randomProblem.description, defaultCode: randomProblem.defaultCode as any } });
         }
       }, 15000); // 15 seconds wait
     }
@@ -1148,9 +1237,86 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on(SOCKET_EVENTS.LEAVE_MATCH, (matchId: string) => {
+    console.log(`[Socket] User ${socket.id} explicitly left match ${matchId}`);
+    const match = activeMatches[matchId];
+    if (match) {
+      let disconnectedUserId: string | null = null;
+      for (const uid in match.players) {
+        if (match.players[uid].socketId === socket.id) {
+          disconnectedUserId = uid;
+          break;
+        }
+      }
+      
+      if (disconnectedUserId) {
+        const player = match.players[disconnectedUserId];
+        const totalTestCases = match.problem.testCases?.length || 1;
+
+        if (player.score > 0 && player.score >= totalTestCases) {
+          for (const uid in match.players) {
+            if (uid !== disconnectedUserId) {
+              match.players[uid].score = -1;
+            } else {
+              match.players[uid].score = 999;
+            }
+          }
+          endMatch(matchId, 'All tests passed (User Disconnected)');
+        } else {
+          for (const uid in match.players) {
+            if (uid === disconnectedUserId) {
+              match.players[uid].score = -1;
+            } else {
+              match.players[uid].score = 999;
+            }
+          }
+          endMatch(matchId, 'Opponent abandoned the match');
+        }
+      }
+    }
+  });
+
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
     matchmakingQueue = matchmakingQueue.filter(p => p.socketId !== socket.id);
+
+    for (const matchId in activeMatches) {
+      const match = activeMatches[matchId];
+      let disconnectedUserId: string | null = null;
+      
+      for (const uid in match.players) {
+        if (match.players[uid].socketId === socket.id) {
+          disconnectedUserId = uid;
+          break;
+        }
+      }
+
+      if (disconnectedUserId) {
+        const player = match.players[disconnectedUserId];
+        const totalTestCases = match.problem.testCases?.length || 1;
+
+        if (player.score > 0 && player.score >= totalTestCases) {
+          for (const uid in match.players) {
+            if (uid !== disconnectedUserId) {
+              match.players[uid].score = -1;
+            } else {
+              match.players[uid].score = 999;
+            }
+          }
+          endMatch(matchId, 'All tests passed (User Disconnected)');
+        } else {
+          for (const uid in match.players) {
+            if (uid === disconnectedUserId) {
+              match.players[uid].score = -1;
+            } else {
+              match.players[uid].score = 999;
+            }
+          }
+          endMatch(matchId, 'Opponent abandoned the match');
+        }
+        break;
+      }
+    }
   });
 });
 

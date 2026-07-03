@@ -191,28 +191,28 @@ const MatchPanel: React.FC = () => {
 
       {/* Opponent Tracker - Only visible in battle mode */}
       {gameMode === 'battle' && (
-        <div className="glass-panel rounded-2xl p-6 flex flex-col gap-6 relative overflow-hidden flex-1 group">
-          <div className="absolute bottom-0 left-0 w-40 h-40 bg-purple-500/10 rounded-full blur-[60px] -ml-10 -mb-10 transition-all duration-700 group-hover:bg-purple-500/20"></div>
+        <div className="glass-panel rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden shrink-0 group">
+          <div className="absolute bottom-0 left-0 w-32 h-32 bg-purple-500/10 rounded-full blur-[50px] -ml-8 -mb-8 transition-all duration-700 group-hover:bg-purple-500/20"></div>
 
-          <div className="flex items-center gap-3 z-10">
-            <div className="p-2 bg-white/5 rounded-lg border border-white/10 shadow-inner">
-              <Trophy size={18} className="text-yellow-400" />
+          <div className="flex items-center gap-2 z-10">
+            <div className="p-1.5 bg-white/5 rounded-lg border border-white/10 shadow-inner">
+              <Trophy size={16} className="text-yellow-400" />
             </div>
-            <h3 className="text-sm font-bold text-gray-200 uppercase tracking-wider">Battle Status</h3>
+            <h3 className="text-xs font-bold text-gray-200 uppercase tracking-wider">Battle Status</h3>
           </div>
           
-          <div className="space-y-6 z-10">
-            <div className="space-y-3">
+          <div className="space-y-3 z-10">
+            <div className="space-y-2">
               <div className="flex justify-between items-end">
-                <div className="flex flex-col gap-1">
-                  <span className="text-sm font-semibold text-gray-300 flex items-center gap-2">
-                    Opponent <span className="text-gray-500 font-normal">({opponentUsername || 'ProCoder123'})</span>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs font-semibold text-gray-300 flex items-center gap-1.5">
+                    Opponent {opponentUsername ? <span className="text-gray-500 font-normal">({opponentUsername})</span> : <span className="text-gray-500 italic font-normal">(Connecting...)</span>}
                   </span>
                   {opponentElo && <RankBadge elo={opponentElo} size="sm" />}
                 </div>
-                <span className="text-lg font-black text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]">{Number(opponentProgress).toFixed(2)}%</span>
+                <span className="text-base font-black text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]">{Number(opponentProgress).toFixed(2)}%</span>
               </div>
-              <div className="w-full bg-black/50 rounded-full h-3 p-0.5 border border-white/5 shadow-inner">
+              <div className="w-full bg-black/50 rounded-full h-2.5 p-0.5 border border-white/5 shadow-inner">
                 <div 
                   className="bg-gradient-to-r from-yellow-600 to-yellow-400 h-full rounded-full transition-all duration-700 ease-out relative overflow-hidden shadow-[0_0_10px_rgba(250,204,21,0.5)]"
                   style={{ width: `${opponentProgress}%` }}
@@ -222,9 +222,9 @@ const MatchPanel: React.FC = () => {
               </div>
             </div>
 
-            <div className={`p-4 glass-panel rounded-xl flex items-center gap-3 transition-all duration-500 ${isOpponentTyping ? 'border-yellow-500/30 shadow-[0_0_15px_rgba(234,179,8,0.15)]' : 'border-white/5'}`}>
-              <Activity size={16} className={isOpponentTyping ? 'text-yellow-400 animate-pulse' : 'text-gray-600'} />
-              <span className={`text-sm font-medium ${isOpponentTyping ? 'text-yellow-400' : 'text-gray-500'}`}>
+            <div className={`p-2.5 glass-panel rounded-lg flex items-center gap-2 transition-all duration-500 ${isOpponentTyping ? 'border-yellow-500/30 shadow-[0_0_15px_rgba(234,179,8,0.15)]' : 'border-white/5'}`}>
+              <Activity size={14} className={isOpponentTyping ? 'text-yellow-400 animate-pulse' : 'text-gray-600'} />
+              <span className={`text-xs font-medium ${isOpponentTyping ? 'text-yellow-400' : 'text-gray-500'}`}>
                 {isOpponentTyping ? 'Typing code...' : 'Idle'}
               </span>
             </div>

@@ -81,6 +81,10 @@ const ArenaPage: React.FC = () => {
     }
 
     return () => {
+      if (socket.connected) {
+        socket.emit(SOCKET_EVENTS.LEAVE_MATCH, matchId);
+      }
+      
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
       socket.off(SOCKET_EVENTS.OPPONENT_TYPING, onOpponentTyping);
@@ -162,7 +166,7 @@ const ArenaPage: React.FC = () => {
                   {gameMode === 'solo' ? 'PRACTICE COMPLETE!' : 'VICTORY!'}
                 </h2>
                 <p className="text-gray-300 mb-6 font-medium">{matchOverResult.reason}</p>
-                {gameMode !== 'solo' && (
+                {gameMode !== 'solo' && !matchOverResult.matchId.startsWith('match-private-') && (
                   <div className="bg-black/40 rounded-xl p-4 w-full flex justify-between items-center mb-8 border border-white/5">
                     <span className="text-gray-400 font-bold">Elo Rating</span>
                     <span className="text-2xl font-black text-green-400">+{matchOverResult.winnerEloChange}</span>
@@ -176,10 +180,12 @@ const ArenaPage: React.FC = () => {
                 </div>
                 <h2 className="text-4xl font-black text-white tracking-tight mb-2">DRAW</h2>
                 <p className="text-gray-300 mb-6 font-medium">{matchOverResult.reason}</p>
-                <div className="bg-black/40 rounded-xl p-4 w-full flex justify-between items-center mb-8 border border-white/5">
-                  <span className="text-gray-400 font-bold">Elo Rating</span>
-                  <span className="text-2xl font-black text-gray-400">No Change</span>
-                </div>
+                {!matchOverResult.matchId.startsWith('match-private-') && (
+                  <div className="bg-black/40 rounded-xl p-4 w-full flex justify-between items-center mb-8 border border-white/5">
+                    <span className="text-gray-400 font-bold">Elo Rating</span>
+                    <span className="text-2xl font-black text-gray-400">No Change</span>
+                  </div>
+                )}
               </>
             ) : (
               <>
@@ -188,10 +194,12 @@ const ArenaPage: React.FC = () => {
                 </div>
                 <h2 className="text-4xl font-black text-white tracking-tight mb-2">DEFEAT</h2>
                 <p className="text-gray-300 mb-6 font-medium">{matchOverResult.reason}</p>
-                <div className="bg-black/40 rounded-xl p-4 w-full flex justify-between items-center mb-8 border border-white/5">
-                  <span className="text-gray-400 font-bold">Elo Rating</span>
-                  <span className="text-2xl font-black text-red-400">{matchOverResult.loserEloChange}</span>
-                </div>
+                {!matchOverResult.matchId.startsWith('match-private-') && (
+                  <div className="bg-black/40 rounded-xl p-4 w-full flex justify-between items-center mb-8 border border-white/5">
+                    <span className="text-gray-400 font-bold">Elo Rating</span>
+                    <span className="text-2xl font-black text-red-400">{matchOverResult.loserEloChange}</span>
+                  </div>
+                )}
               </>
             )}
 

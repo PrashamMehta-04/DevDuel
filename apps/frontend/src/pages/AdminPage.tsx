@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Swords, Plus, Trash2, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Swords, Plus, Trash2, ArrowLeft, ArrowRight, Upload } from 'lucide-react';
 
 interface TestCase {
   id: number;
@@ -24,6 +24,53 @@ const AdminPage: React.FC = () => {
   const [problemsList, setProblemsList] = useState<any[]>([]);
   const [editingProblemId, setEditingProblemId] = useState<string | null>(null);
   const [status, setStatus] = useState({ message: '', isError: false });
+  const [defaultCode, setDefaultCode] = useState<Record<string, string> | null>(null);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleGenerateAI = async () => {
+    if (!aiPrompt.trim()) return alert('Enter a prompt for the AI');
+    setIsGenerating(true);
+    setStatus({ message: 'Generating problem with AI... (this may take up to 20 seconds)', isError: false });
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/problems/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ prompt: aiPrompt })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to generate problem');
+      
+      setTitle(data.title || '');
+      setDescription(data.description || '');
+      setConstraints(data.constraints || '');
+      setDifficulty(data.difficulty || 'EASY');
+      if (data.defaultCode) setDefaultCode(data.defaultCode);
+      if (data.testCases && Array.isArray(data.testCases)) {
+        setTestCases(data.testCases.map((tc: any, i: number) => {
+          let inputs = [tc.input];
+          try {
+             const parsed = JSON.parse(tc.input);
+             if (Array.isArray(parsed)) inputs = parsed.map((x: any) => JSON.stringify(x));
+          } catch(e) {}
+          return {
+            id: Date.now() + i,
+            inputs,
+            expected: tc.expected,
+            isHidden: tc.isHidden || false
+          };
+        }));
+      }
+      
+      setStatus({ message: 'AI generated problem successfully! Review and hit Save.', isError: false });
+      setAiPrompt('');
+    } catch (err: any) {
+      setStatus({ message: err.message, isError: true });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   React.useEffect(() => {
     if (location.state?.tab) {
@@ -47,8 +94,10 @@ const AdminPage: React.FC = () => {
     setDescription('');
     setConstraints('');
     setDifficulty('EASY');
+    setDefaultCode(null);
     setTestCases([{ id: Date.now(), inputs: [''], expected: '', isHidden: false }]);
     setStatus({ message: '', isError: false });
+    setAiPrompt('');
   };
 
   const handleEdit = (problem: any) => {
@@ -57,6 +106,7 @@ const AdminPage: React.FC = () => {
     setDescription(problem.description);
     setConstraints(problem.constraints || '');
     setDifficulty(problem.difficulty || 'EASY');
+    setDefaultCode(problem.defaultCode || null);
     if (problem.testCases && Array.isArray(problem.testCases)) {
       setTestCases(problem.testCases.map((tc: any, idx: number) => {
         let inputs = [''];
@@ -86,6 +136,22 @@ const AdminPage: React.FC = () => {
       ...testCases, 
       { id: Date.now(), inputs: [''], expected: '', isHidden: false }
     ]);
+  };
+
+  const handleFileUpload = (tcId: number, fieldType: 'param' | 'expected', pIdx?: number) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (fieldType === 'param' && pIdx !== undefined) {
+        updateParam(tcId, pIdx, content.trim());
+      } else if (fieldType === 'expected') {
+        updateTestCase(tcId, 'expected', content.trim());
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   const removeTestCase = (id: number) => {
@@ -131,6 +197,7 @@ const AdminPage: React.FC = () => {
           description,
           constraints,
           difficulty,
+          defaultCode,
           testCases: testCases.map((t, idx) => ({ 
             id: idx + 1,
             input: '[' + t.inputs.join(',') + ']',
@@ -258,6 +325,31 @@ const AdminPage: React.FC = () => {
                 {status.message}
               </div>
             )}
+
+            {!editingProblemId && (
+              <div className="mb-8 p-6 bg-purple-500/10 border border-purple-500/30 rounded-2xl">
+                <h3 className="text-xl font-bold text-purple-400 mb-4 flex items-center gap-2">
+                  <span className="text-2xl">✨</span> Generate Problem with AI
+                </h3>
+                <div className="flex gap-4">
+                  <input
+                    type="text"
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    placeholder="e.g. Create a medium problem about finding the longest palindromic substring..."
+                    className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleGenerateAI}
+                    disabled={isGenerating}
+                    className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isGenerating ? 'Generating...' : 'Generate'}
+                  </button>
+                </div>
+              </div>
+            )}
             
             <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-2 gap-6">
@@ -341,15 +433,21 @@ const AdminPage: React.FC = () => {
                       </div>
                       <div className="space-y-2">
                         {tc.inputs.map((inp, pIdx) => (
-                          <div key={pIdx} className="flex gap-2">
-                            <input 
-                              required 
-                              type="text" 
-                              value={inp} 
-                              onChange={e => updateParam(tc.id, pIdx, e.target.value)}
-                              className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-blue-500" 
-                              placeholder={`Param ${pIdx + 1} (e.g. [2,7,11,15] or 9)`}
-                            />
+                          <div key={pIdx} className="flex gap-2 items-center">
+                            <div className="relative flex-1 flex items-center">
+                              <input 
+                                required 
+                                type="text" 
+                                value={inp} 
+                                onChange={e => updateParam(tc.id, pIdx, e.target.value)}
+                                className="w-full bg-black/50 border border-white/10 rounded-lg pl-3 pr-10 py-2 text-sm font-mono focus:outline-none focus:border-blue-500" 
+                                placeholder={`Param ${pIdx + 1} (e.g. [2,7,11,15] or 9)`}
+                              />
+                              <label className="absolute right-3 text-gray-400 hover:text-white cursor-pointer transition-colors p-1" title="Upload large parameter from file">
+                                <Upload size={16} />
+                                <input type="file" className="hidden" accept=".txt,.json" onChange={handleFileUpload(tc.id, 'param', pIdx)} />
+                              </label>
+                            </div>
                             {tc.inputs.length > 1 && (
                               <button type="button" onClick={() => removeParam(tc.id, pIdx)} className="text-gray-500 hover:text-red-400 px-2 transition-colors">
                                 <Trash2 size={16} />
@@ -361,14 +459,20 @@ const AdminPage: React.FC = () => {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-500 mb-1">Expected Output (JSON String)</label>
-                      <input 
-                        required 
-                        type="text" 
-                        value={tc.expected} 
-                        onChange={e => updateTestCase(tc.id, 'expected', e.target.value)}
-                        className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-blue-500" 
-                        placeholder='e.g. [0,1]'
-                      />
+                      <div className="relative flex items-center">
+                        <input 
+                          required 
+                          type="text" 
+                          value={tc.expected} 
+                          onChange={e => updateTestCase(tc.id, 'expected', e.target.value)}
+                          className="w-full bg-black/50 border border-white/10 rounded-lg pl-3 pr-10 py-2 text-sm font-mono focus:outline-none focus:border-blue-500" 
+                          placeholder='e.g. [0,1]'
+                        />
+                        <label className="absolute right-3 text-gray-400 hover:text-white cursor-pointer transition-colors p-1" title="Upload expected output from file">
+                          <Upload size={16} />
+                          <input type="file" className="hidden" accept=".txt,.json" onChange={handleFileUpload(tc.id, 'expected')} />
+                        </label>
+                      </div>
                     </div>
                   </div>
                   <div className="mt-3 flex items-center gap-2">

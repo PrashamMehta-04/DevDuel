@@ -32,6 +32,7 @@ export const SOCKET_EVENTS = {
   JOIN_PRIVATE_MATCH_ERROR: 'match:join_private_error',
 
   START_PRACTICE: 'match:start_practice',
+  LEAVE_MATCH: 'leave_match',
 } as const;
 
 export interface CodeUpdatePayload {
