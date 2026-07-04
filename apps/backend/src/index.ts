@@ -908,11 +908,11 @@ io.on('connection', (socket) => {
     
     // Helper to get random unsolved problem
     const getRandomUnsolvedProblem = async (userIds: string[]) => {
-      const solvedMatches = await prisma.match.findMany({
-        where: { winnerId: { in: userIds } },
+      const solvedSubmissions = await prisma.submission.findMany({
+        where: { userId: { in: userIds }, status: "Accepted" },
         select: { problemId: true }
       });
-      const solvedIds = new Set(solvedMatches.map(m => m.problemId));
+      const solvedIds = new Set(solvedSubmissions.map(s => s.problemId));
       const problems = await prisma.problem.findMany();
       const unsolved = problems.filter(p => !solvedIds.has(p.id));
       if (unsolved.length > 0) return unsolved[Math.floor(Math.random() * unsolved.length)];

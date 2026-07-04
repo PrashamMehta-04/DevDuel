@@ -5,6 +5,7 @@
 ## 🌟 Key Features
 - **Real-Time Multiplayer Duels:** Instantly match with opponents around the globe. Both players receive the same algorithmic challenge, and the first to pass all test cases wins.
 - **Private Custom Rooms:** Challenge your friends in unranked private duels by sharing a unique 6-character room code.
+- **Practice Range:** Practice problems stress-free with no timer or rating changes. The system automatically serves you random problems you haven't solved yet.
 - **Global Elo Rating System:** Win matches to increase your global Elo rating. Lose, and your rating drops. Climb the global leaderboard!
 - **AI-Powered Problem Generation:** An integrated Admin dashboard that leverages Google Gemini AI to instantly generate new competitive programming problems, test cases, and boilerplate code across multiple languages.
 - **Distributed Code Execution Sandbox:** A highly scalable backend architecture that isolates untrusted user code execution into background workers using Redis and BullMQ, completely decoupled from the real-time WebSocket server.
@@ -29,8 +30,7 @@ The project is structured as a **Turborepo Monorepo**, sharing TypeScript interf
 ### Prerequisites
 Make sure you have the following installed on your local machine:
 - Node.js (v18+)
-- PostgreSQL
-- Redis Server (must be running on `localhost:6379`)
+- Docker & Docker Compose (for easily running Postgres & Redis)
 
 ### 1. Clone the repository
 ```bash
@@ -44,28 +44,27 @@ npm install
 ```
 
 ### 3. Setup Environment Variables
-Create a `.env` file in `apps/backend/` and `apps/frontend/` based on their respective `.env.example` files. You will need:
+Create a `.env` file in the root directory as well as in `apps/backend/` and `apps/frontend/` based on their respective `.env.example` files. You will need:
 - `DATABASE_URL` (PostgreSQL connection string)
 - `REDIS_URL` (e.g., `redis://localhost:6379`)
 - `GEMINI_API_KEY`
 - `VITE_GOOGLE_CLIENT_ID` (Frontend only)
 
-### 4. Database Setup
+### 4. Start Infrastructure (Postgres & Redis)
+```bash
+docker-compose up -d postgres redis
+```
+
+### 5. Database Setup
 ```bash
 cd apps/backend
 npx prisma generate
-npx prisma db push
+npx prisma migrate deploy
 cd ../../
 ```
 
-### 5. Build Shared Packages
-Because this is a monorepo, you must build the shared types package before starting the dev servers:
-```bash
-npm run build --workspace=@devduel/shared
-```
-
 ### 6. Start the Servers
-From the root directory, start both the frontend and backend concurrently:
+From the root directory, start the frontend, backend, and worker concurrently:
 ```bash
 npm run dev
 ```

@@ -282,7 +282,7 @@ const DashboardPage: React.FC = () => {
               <BrainCircuit size={32} className="text-green-400" />
             </div>
             
-            <h2 className="text-2xl font-black text-white mb-2 tracking-tight">Zen Sandbox</h2>
+            <h2 className="text-2xl font-black text-white mb-2 tracking-tight">Practice Range</h2>
             <p className="text-gray-400 font-medium mb-8 text-sm">Practice problems stress-free with no timer or rating changes.</p>
             
             <button 
