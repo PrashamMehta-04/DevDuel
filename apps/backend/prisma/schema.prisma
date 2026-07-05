@@ -34,6 +34,8 @@ model Problem {
   description String
   constraints String?
   difficulty  String   @default("EASY")
+  timeLimit   Int      @default(5000)
+  memoryLimit Int      @default(128)
   testCases   Json
   defaultCode Json?
   submissions Submission[]

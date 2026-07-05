@@ -67,6 +67,8 @@ export interface SubmissionPayload {
   type: 'run' | 'submit';
   problemId?: string;
   testCases?: any[]; // The tests to run against
+  timeLimit?: number; // Time limit in milliseconds
+  memoryLimit?: number; // Memory limit in MB
 }
 
 export interface SubmissionResultPayload {

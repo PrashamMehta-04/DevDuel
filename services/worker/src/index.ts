@@ -138,7 +138,7 @@ function javaPrint(varName: string, type: string): string {
 const worker = new Worker(
   'code-execution',
   async (job: Job<SubmissionPayload>) => {
-    const { matchId, userId, code, language, type, testCases, problemId } = job.data;
+    const { matchId, userId, code, language, type, testCases, problemId, timeLimit, memoryLimit } = job.data;
     console.log(`\n[Worker] 🛠️  Processing ${type.toUpperCase()} for User: ${userId}`);
 
     const config = RUNTIME_CONFIG[language];
@@ -207,6 +207,8 @@ const worker = new Worker(
       
       const cmd = config.getCmd(code, inputs);
 
+      const memLimitMB = memoryLimit || 128;
+      
       container = await docker.createContainer({
         Image: config.image,
         Cmd: cmd,
@@ -214,7 +216,7 @@ const worker = new Worker(
         AttachStderr: true,
         Env: [`CODE_B64=${base64Code}`, `WRAPPER_B64=${wrapperBase64}`, `MAIN_B64=${mainBase64}`],
         HostConfig: {
-          Memory: 128 * 1024 * 1024,
+          Memory: memLimitMB * 1024 * 1024,
           NetworkMode: 'none',
         },
       });
@@ -233,8 +235,9 @@ const worker = new Worker(
       });
 
       const waitPromise = container.wait();
+      const limit = timeLimit || 5000;
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Time Limit Exceeded (5s)')), 5000)
+        setTimeout(() => reject(new Error(`Time Limit Exceeded (${limit/1000}s)`)), limit)
       );
       
       await Promise.race([waitPromise, timeoutPromise]);

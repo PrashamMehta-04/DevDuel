@@ -1200,6 +1200,8 @@ io.on('connection', (socket) => {
     try {
       let problemId = activeMatches[payload.matchId]?.problem?.id;
       let testCases = activeMatches[payload.matchId]?.problem?.testCases || [];
+      let timeLimit = (activeMatches[payload.matchId]?.problem as any)?.timeLimit;
+      let memoryLimit = (activeMatches[payload.matchId]?.problem as any)?.memoryLimit;
 
       if (!problemId) {
          // In Daily Problem mode, matchId might be the problemId itself
@@ -1215,6 +1217,8 @@ io.on('connection', (socket) => {
          if (problem) {
             problemId = problem.id;
             testCases = problem.testCases as any[];
+            timeLimit = problem.timeLimit;
+            memoryLimit = problem.memoryLimit;
          } else {
             console.error(`[Socket] ❌ Could not find problem for matchId: ${payload.matchId}`);
             socket.emit(SOCKET_EVENTS.TEST_RESULT, { userId: payload.userId, success: false, results: [], error: 'Match session expired or server restarted. Please start a new match.' });
@@ -1229,7 +1233,9 @@ io.on('connection', (socket) => {
         language: payload.language,
         type: payload.type,
         problemId: problemId,
-        testCases: testCases
+        testCases: testCases,
+        timeLimit: timeLimit,
+        memoryLimit: memoryLimit
       });
       console.log(`[Queue] 🎟️  Job added to queue with ID: ${job.id}`);
     } catch (err) {
