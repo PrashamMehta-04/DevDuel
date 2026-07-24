@@ -35,7 +35,7 @@ interface ActiveMatch {
   matchId: string;
   problem: any;
   players: Record<string, ActiveMatchPlayer>;
-  timer: NodeJS.Timeout;
+  timer?: NodeJS.Timeout;
   botInterval?: NodeJS.Timeout;
 }
 
@@ -53,6 +53,18 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
 const prisma = new PrismaClient();
+
+async function getRandomUnsolvedProblem(userIds: string[]) {
+  const solvedSubmissions = await prisma.submission.findMany({
+    where: { userId: { in: userIds }, status: "Accepted" },
+    select: { problemId: true }
+  });
+  const solvedIds = new Set(solvedSubmissions.map(s => s.problemId));
+  const problems = await prisma.problem.findMany();
+  const unsolved = problems.filter(p => !solvedIds.has(p.id));
+  if (unsolved.length > 0) return unsolved[Math.floor(Math.random() * unsolved.length)];
+  return problems[Math.floor(Math.random() * problems.length)];
+}
 
 async function seedAdmin() {
   const adminExists = await prisma.user.findUnique({ where: { username: 'admin' } });
@@ -712,7 +724,9 @@ async function endMatch(matchId: string, reason: string) {
   const match = activeMatches[matchId];
   if (!match) return;
 
-  clearTimeout(match.timer);
+  if (match.timer) {
+    clearTimeout(match.timer);
+  }
   if (match.botInterval) {
     clearInterval(match.botInterval);
   }
@@ -746,10 +760,20 @@ async function endMatch(matchId: string, reason: string) {
 
     let winnerEloChange = 0;
     let loserEloChange = 0;
-    if (winnerId) {
+    if (winnerId && loserId) {
       if (!matchId.startsWith('match-private-')) {
-        winnerEloChange = 25;
-        loserEloChange = -25;
+        const winner = match.players[winnerId];
+        const loser = match.players[loserId];
+        if (winner && loser) {
+          // Standard Elo rating calculation
+          const expectedWinner = 1 / (1 + Math.pow(10, (loser.rating - winner.rating) / 400));
+          const kFactor = 32;
+          winnerEloChange = Math.max(5, Math.round(kFactor * (1 - expectedWinner)));
+          loserEloChange = -winnerEloChange;
+        } else {
+          winnerEloChange = 25;
+          loserEloChange = -25;
+        }
       }
     }
 
@@ -906,18 +930,7 @@ io.on('connection', (socket) => {
   socket.on(SOCKET_EVENTS.START_PRACTICE, async (payload: { userId: string, username: string }) => {
     payload.userId = socket.data.userId;
     
-    // Helper to get random unsolved problem
-    const getRandomUnsolvedProblem = async (userIds: string[]) => {
-      const solvedSubmissions = await prisma.submission.findMany({
-        where: { userId: { in: userIds }, status: "Accepted" },
-        select: { problemId: true }
-      });
-      const solvedIds = new Set(solvedSubmissions.map(s => s.problemId));
-      const problems = await prisma.problem.findMany();
-      const unsolved = problems.filter(p => !solvedIds.has(p.id));
-      if (unsolved.length > 0) return unsolved[Math.floor(Math.random() * unsolved.length)];
-      return problems[Math.floor(Math.random() * problems.length)];
-    };
+
 
     const randomProblem = await getRandomUnsolvedProblem([payload.userId]);
     const matchId = `solo-${Date.now()}`;
@@ -928,7 +941,7 @@ io.on('connection', (socket) => {
       matchId,
       problem: randomProblem,
       players: {
-        [payload.userId]: { userId: payload.userId, socketId: socket.id, rating: 1200, score: 0, lastSubmitTime: 0, username: payload.username }
+        [payload.userId]: { userId: payload.userId, socketId: socket.id, rating: 1200, score: 0, lastSubmitTime: 0 }
       }
       // No timer for Zen Mode Sandbox!
     };
@@ -989,21 +1002,7 @@ io.on('connection', (socket) => {
     const startTime = Date.now();
     const endTime = startTime + MATCH_DURATION;
 
-    // Helper to get random unsolved problem
-    const getRandomUnsolvedProblem = async (userIds: string[]) => {
-      const solvedMatches = await prisma.match.findMany({
-        where: { winnerId: { in: userIds } },
-        select: { problemId: true }
-      });
-      const solvedIds = new Set(solvedMatches.map(m => m.problemId));
-      const problems = await prisma.problem.findMany();
-      const unsolved = problems.filter(p => !solvedIds.has(p.id));
-      
-      if (unsolved.length > 0) {
-        return unsolved[Math.floor(Math.random() * unsolved.length)];
-      }
-      return problems[Math.floor(Math.random() * problems.length)];
-    };
+
     
     const randomProblem = await getRandomUnsolvedProblem([payload.userId, opponent.userId]);
 
@@ -1038,21 +1037,7 @@ io.on('connection', (socket) => {
     payload.userId = socket.data.userId; // Secure override
     console.log(`[Socket] 🔍 User ${payload.userId} (${payload.username}, Rating: ${payload.rating}) is looking for a match.`);
 
-    // Helper to get random unsolved problem
-    const getRandomUnsolvedProblem = async (userIds: string[]) => {
-      const solvedMatches = await prisma.match.findMany({
-        where: { winnerId: { in: userIds } },
-        select: { problemId: true }
-      });
-      const solvedIds = new Set(solvedMatches.map(m => m.problemId));
-      const problems = await prisma.problem.findMany();
-      const unsolved = problems.filter(p => !solvedIds.has(p.id));
-      
-      if (unsolved.length > 0) {
-        return unsolved[Math.floor(Math.random() * unsolved.length)];
-      }
-      return problems[Math.floor(Math.random() * problems.length)];
-    };
+
 
     // Check if there is a suitable opponent in the queue (within 200 rating points)
     const RATING_TOLERANCE = 200;

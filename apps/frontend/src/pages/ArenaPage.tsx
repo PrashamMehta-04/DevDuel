@@ -122,13 +122,12 @@ const ArenaPage: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            {gameMode === 'battle' && (
+            {gameMode === 'battle' ? (
               <>
-
                 <div className="flex items-center gap-2 px-4 py-1.5 glass-panel rounded-full border border-white/10 shadow-inner bg-black/20">
                   <Clock size={14} className="text-gray-400" />
                   <span className="text-sm font-bold tracking-widest font-mono text-gray-200">
-                    {gameMode === 'solo' ? 'ZEN MODE' : timeLeft}
+                    {timeLeft}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 px-4 py-1.5 glass-panel rounded-full border border-white/10 shadow-inner">
@@ -138,6 +137,13 @@ const ArenaPage: React.FC = () => {
                   </span>
                 </div>
               </>
+            ) : (
+              <div className="flex items-center gap-2 px-4 py-1.5 glass-panel rounded-full border border-white/10 shadow-inner bg-black/20">
+                <Clock size={14} className="text-gray-400" />
+                <span className="text-sm font-bold tracking-widest font-mono text-gray-200">
+                  ZEN MODE
+                </span>
+              </div>
             )}
           </div>
         </header>

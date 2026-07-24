@@ -164,6 +164,7 @@ const worker = new Worker(
       } else if (language === 'javascript') {
          wrapperCode = `${code}\n\nconst inputs = JSON.parse(\`${JSON.stringify(inputs).replace(/\\/g, '\\\\').replace(/`/g, '\\`')}\`);\nfor (const inp of inputs) {\n    try {\n        const args = JSON.parse(inp);\n        const result = solution(...args);\n        console.log("@@RESULT@@" + JSON.stringify(result));\n    } catch (e) {\n        console.log("@@RESULT@@Error:", e.message);\n    }\n}`;
       } else if (language === 'cpp') {
+         const hasClassSolution = /\bclass\s+Solution\b/.test(code);
          let mainBody = '\n#include <iostream>\n#include <vector>\n#include <string>\n';
          mainBody += 'std::string to_json(int v) { return std::to_string(v); }\n';
          mainBody += 'std::string to_json(bool v) { return v ? "true" : "false"; }\n';
@@ -180,7 +181,13 @@ const worker = new Worker(
              mainBody += `        ${cppType} arg${j} = ${toCppVal(args[j], sig.args[j])};\n`;
              argNames.push(`arg${j}`);
            }
-           mainBody += `        auto res = solution(${argNames.join(', ')});\n        ${cppPrint('res', sig.ret)}\n    } catch(...) { std::cout << "@@RESULT@@Error" << std::endl; }\n`;
+           if (hasClassSolution) {
+             mainBody += `        Solution sol;\n`;
+             mainBody += `        auto res = sol.solution(${argNames.join(', ')});\n`;
+           } else {
+             mainBody += `        auto res = solution(${argNames.join(', ')});\n`;
+           }
+           mainBody += `        ${cppPrint('res', sig.ret)}\n    } catch(...) { std::cout << "@@RESULT@@Error" << std::endl; }\n`;
          }
          mainBody += '    return 0;\n}\n';
          wrapperCode = code + mainBody;
@@ -217,6 +224,7 @@ const worker = new Worker(
         Env: [`CODE_B64=${base64Code}`, `WRAPPER_B64=${wrapperBase64}`, `MAIN_B64=${mainBase64}`],
         HostConfig: {
           Memory: memLimitMB * 1024 * 1024,
+          NanoCpus: 1000000000,
           NetworkMode: 'none',
         },
       });
